@@ -11,7 +11,7 @@ if [ "$(id -u)" = "0" ]; then
 	if [ -d /data ]; then
 		chown app:app /data || true
 	fi
-	exec runuser -u app -- java $JAVA_OPTS -jar /app/app.jar
+	exec su -s /bin/sh app -c "exec java $JAVA_OPTS -jar /app/app.jar"
 fi
 
 exec java $JAVA_OPTS -jar /app/app.jar
