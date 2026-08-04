@@ -74,10 +74,18 @@ class MediaService(
 	}
 
 	fun publicUrl(asset: MediaAsset): String =
-		"${publicBaseUrl.trimEnd('/')}/api/media/${asset.id}"
+		"${normalizedPublicBaseUrl()}/api/media/${asset.id}"
 
 	fun publicUrlById(id: String): String =
-		"${publicBaseUrl.trimEnd('/')}/api/media/$id"
+		"${normalizedPublicBaseUrl()}/api/media/$id"
+
+	private fun normalizedPublicBaseUrl(): String {
+		val base = publicBaseUrl.trim().trimEnd('/')
+		if (base.startsWith("http://") || base.startsWith("https://")) {
+			return base
+		}
+		return "https://$base"
+	}
 
 	private fun isAllowed(contentType: String): Boolean =
 		contentType.startsWith("image/") || contentType.startsWith("video/")
