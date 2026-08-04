@@ -1,0 +1,10 @@
+.git
+.gradle
+.idea
+.kotlin
+.cursor
+build
+data
+*.md
+.DS_Store
+**/.DS_Store

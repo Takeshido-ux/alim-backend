@@ -1,0 +1,9 @@
+meta:
+  environment: docker
+  toolchain:
+    name: docker
+
+run:
+  containerPort: 8080
+  # Persistent disk for uploaded media (survives redeploys)
+  persistenceMount: /data
