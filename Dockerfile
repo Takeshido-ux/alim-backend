@@ -12,9 +12,11 @@ RUN groupadd --system app \
 	&& mkdir -p /data/media \
 	&& chown -R app:app /app /data
 COPY --from=build /workspace/build/libs/*.jar /app/app.jar
-USER app
+COPY docker-entrypoint.sh /app/docker-entrypoint.sh
+RUN chmod +x /app/docker-entrypoint.sh
 ENV JAVA_OPTS="-XX:MaxRAMPercentage=75.0 -XX:+UseG1GC" \
 	SPRING_PROFILES_ACTIVE=prod \
 	MEDIA_ROOT_DIR=/data/media
 EXPOSE 8080
-ENTRYPOINT ["sh", "-c", "java $JAVA_OPTS -jar /app/app.jar"]
+# Start as root so entrypoint can chown Railway volume, then drop to app.
+ENTRYPOINT ["/app/docker-entrypoint.sh"]
