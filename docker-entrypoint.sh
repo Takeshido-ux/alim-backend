@@ -2,16 +2,12 @@
 set -eu
 
 MEDIA_DIR="${MEDIA_ROOT_DIR:-/data/media}"
-mkdir -p "$MEDIA_DIR"
 
-# Railway volumes are often root-owned; fix before dropping privileges.
-if [ "$(id -u)" = "0" ]; then
-	chown -R app:app "$MEDIA_DIR" || true
-	# also ensure parent mount is usable when volume is at /data
-	if [ -d /data ]; then
-		chown app:app /data || true
-	fi
-	exec su -s /bin/sh app -c "exec java $JAVA_OPTS -jar /app/app.jar"
+# Railway bind-mounts /data as root-owned; ensure the media dir exists and is writable.
+mkdir -p "$MEDIA_DIR"
+chmod 777 "$MEDIA_DIR" 2>/dev/null || true
+if [ -d /data ]; then
+	chmod 777 /data 2>/dev/null || true
 fi
 
 exec java $JAVA_OPTS -jar /app/app.jar
