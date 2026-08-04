@@ -70,8 +70,14 @@ class SecurityConfig {
 	fun corsConfigurationSource(
 		@Value("\${app.cors.allowed-origins:http://localhost:5173}") allowedOrigins: String,
 	): CorsConfigurationSource {
+		val origins = allowedOrigins.split(',').map { it.trim() }.filter { it.isNotEmpty() }
 		val configuration = CorsConfiguration().apply {
-			this.allowedOrigins = allowedOrigins.split(',').map { it.trim() }.filter { it.isNotEmpty() }
+			// "*" with allowCredentials=true is illegal for allowedOrigins; patterns are allowed.
+			if (origins.contains("*")) {
+				allowedOriginPatterns = listOf("*")
+			} else {
+				this.allowedOrigins = origins
+			}
 			allowedMethods = listOf("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS")
 			allowedHeaders = listOf("*")
 			exposedHeaders = listOf("Authorization")
