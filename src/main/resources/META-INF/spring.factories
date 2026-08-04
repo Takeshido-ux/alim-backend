@@ -1,4 +1,2 @@
 org.springframework.boot.EnvironmentPostProcessor=\
 com.example.alim.persistence.DatasourceUrlEnvironmentPostProcessor
-org.springframework.boot.env.EnvironmentPostProcessor=\
-com.example.alim.persistence.DatasourceUrlEnvironmentPostProcessor

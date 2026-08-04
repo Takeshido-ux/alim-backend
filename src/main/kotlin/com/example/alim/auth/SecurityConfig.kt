@@ -104,6 +104,12 @@ class SecurityConfig {
 						"/api/auth/login",
 						"/api/admin/auth/login",
 					).permitAll()
+					.requestMatchers(
+						"/scalar",
+						"/scalar/**",
+						"/v3/api-docs",
+						"/v3/api-docs/**",
+					).permitAll()
 					.requestMatchers(HttpMethod.GET, "/api/media/**").permitAll()
 					.requestMatchers("/api/admin/**").hasRole(TokenService.ROLE_ADMIN)
 					.requestMatchers("/api/**").authenticated()
