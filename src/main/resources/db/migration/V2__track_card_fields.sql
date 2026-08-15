@@ -1,0 +1,4 @@
+ALTER TABLE tracks
+    ADD COLUMN description TEXT NOT NULL DEFAULT '',
+    ADD COLUMN icon_color VARCHAR(7) NOT NULL DEFAULT '#6236FF',
+    ADD COLUMN background_img TEXT NOT NULL DEFAULT '';

@@ -30,6 +30,9 @@ class TrackService(
 				slug = slug,
 				order = input.order,
 				title = input.title.trim(),
+				description = input.description.trim(),
+				iconColor = input.iconColor.trim(),
+				backgroundImg = input.backgroundImg.trim(),
 				stickerMilestones = input.stickerMilestones,
 				createdAt = now,
 				updatedAt = now,
@@ -44,6 +47,9 @@ class TrackService(
 			existing.copy(
 				order = input.order,
 				title = input.title.trim(),
+				description = input.description.trim(),
+				iconColor = input.iconColor.trim(),
+				backgroundImg = input.backgroundImg.trim(),
 				stickerMilestones = input.stickerMilestones,
 				updatedAt = Instant.now(),
 			),
@@ -63,6 +69,15 @@ class TrackService(
 		if (input.title.isBlank()) {
 			throw InvalidTrackDataException("title is required")
 		}
+		if (input.description.isBlank()) {
+			throw InvalidTrackDataException("description is required")
+		}
+		if (!HEX_COLOR.matches(input.iconColor.trim())) {
+			throw InvalidTrackDataException("iconColor must be a #RRGGBB value")
+		}
+		if (input.backgroundImg.isBlank()) {
+			throw InvalidTrackDataException("backgroundImg is required")
+		}
 		input.stickerMilestones.forEach { (lessonOrder, stickerId) ->
 			if (lessonOrder < 1) {
 				throw InvalidTrackDataException("stickerMilestones keys must be >= 1")
@@ -77,8 +92,13 @@ class TrackService(
 data class TrackWriteInput(
 	val order: Int,
 	val title: String,
+	val description: String,
+	val iconColor: String,
+	val backgroundImg: String,
 	val stickerMilestones: Map<Int, String> = emptyMap(),
 )
+
+private val HEX_COLOR = Regex("^#[0-9A-Fa-f]{6}$")
 
 class TrackNotFoundException : RuntimeException()
 

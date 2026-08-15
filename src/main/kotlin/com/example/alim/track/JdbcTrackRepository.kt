@@ -20,6 +20,9 @@ class JdbcTrackRepository(
 			slug = rs.getString("slug"),
 			order = rs.getInt("sort_order"),
 			title = rs.getString("title"),
+			description = rs.getString("description"),
+			iconColor = rs.getString("icon_color"),
+			backgroundImg = rs.getString("background_img"),
 			stickerMilestones = rawMilestones.mapKeys { (key, _) -> key.toInt() },
 			createdAt = rs.getTimestamp("created_at").toInstant(),
 			updatedAt = rs.getTimestamp("updated_at").toInstant(),
@@ -29,7 +32,7 @@ class JdbcTrackRepository(
 	override fun findAll(): List<Track> =
 		jdbc.query(
 			"""
-			SELECT id, slug, sort_order, title, sticker_milestones::text, created_at, updated_at
+			SELECT id, slug, sort_order, title, description, icon_color, background_img, sticker_milestones::text, created_at, updated_at
 			FROM tracks
 			ORDER BY sort_order, slug
 			""".trimIndent(),
@@ -39,7 +42,7 @@ class JdbcTrackRepository(
 	override fun findById(id: String): Track? =
 		jdbc.query(
 			"""
-			SELECT id, slug, sort_order, title, sticker_milestones::text, created_at, updated_at
+			SELECT id, slug, sort_order, title, description, icon_color, background_img, sticker_milestones::text, created_at, updated_at
 			FROM tracks
 			WHERE id = ?
 			""".trimIndent(),
@@ -50,7 +53,7 @@ class JdbcTrackRepository(
 	override fun findBySlug(slug: String): Track? =
 		jdbc.query(
 			"""
-			SELECT id, slug, sort_order, title, sticker_milestones::text, created_at, updated_at
+			SELECT id, slug, sort_order, title, description, icon_color, background_img, sticker_milestones::text, created_at, updated_at
 			FROM tracks
 			WHERE slug = ?
 			""".trimIndent(),
@@ -62,12 +65,15 @@ class JdbcTrackRepository(
 		val milestones = track.stickerMilestones.mapKeys { it.key.toString() }
 		jdbc.update(
 			"""
-			INSERT INTO tracks (id, slug, sort_order, title, sticker_milestones, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?, ?)
+			INSERT INTO tracks (id, slug, sort_order, title, description, icon_color, background_img, sticker_milestones, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (id) DO UPDATE SET
 				slug = EXCLUDED.slug,
 				sort_order = EXCLUDED.sort_order,
 				title = EXCLUDED.title,
+				description = EXCLUDED.description,
+				icon_color = EXCLUDED.icon_color,
+				background_img = EXCLUDED.background_img,
 				sticker_milestones = EXCLUDED.sticker_milestones,
 				created_at = EXCLUDED.created_at,
 				updated_at = EXCLUDED.updated_at
@@ -76,6 +82,9 @@ class JdbcTrackRepository(
 			track.slug,
 			track.order,
 			track.title,
+			track.description,
+			track.iconColor,
+			track.backgroundImg,
 			json.toJsonb(milestones),
 			track.createdAt.toTimestamp(),
 			track.updatedAt.toTimestamp(),
