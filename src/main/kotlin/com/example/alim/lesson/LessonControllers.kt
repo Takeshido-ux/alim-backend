@@ -33,6 +33,9 @@ data class LessonWriteRequest(
 	val orderInTrack: Int,
 	@field:NotBlank(message = "title is required")
 	val title: String,
+	@field:NotBlank(message = "description is required")
+	val description: String,
+	val backgroundImg: String = "",
 	@field:NotBlank(message = "parentNote is required")
 	val parentNote: String,
 	val contentVersion: String = "1",
@@ -55,6 +58,8 @@ data class LessonResponse(
 	val trackId: String,
 	val orderInTrack: Int,
 	val title: String,
+	val description: String,
+	val backgroundImg: String,
 	val parentNote: String,
 	val contentVersion: String,
 	val steps: List<LessonStepResponse>,
@@ -68,6 +73,8 @@ data class LessonSummaryResponse(
 	val trackId: String,
 	val orderInTrack: Int,
 	val title: String,
+	val description: String,
+	val backgroundImg: String,
 	val contentVersion: String,
 )
 
@@ -135,6 +142,8 @@ private fun LessonWriteRequest.toInput() =
 		trackId = trackId.trim(),
 		orderInTrack = orderInTrack,
 		title = title,
+		description = description,
+		backgroundImg = backgroundImg,
 		parentNote = parentNote,
 		contentVersion = contentVersion,
 		steps = steps.map {
@@ -154,6 +163,8 @@ private fun Lesson.toResponse() =
 		trackId = trackId,
 		orderInTrack = orderInTrack,
 		title = title,
+		description = description,
+		backgroundImg = backgroundImg,
 		parentNote = parentNote,
 		contentVersion = contentVersion,
 		steps = steps.map {
@@ -175,5 +186,7 @@ private fun Lesson.toSummaryResponse() =
 		trackId = trackId,
 		orderInTrack = orderInTrack,
 		title = title,
+		description = description,
+		backgroundImg = backgroundImg,
 		contentVersion = contentVersion,
 	)

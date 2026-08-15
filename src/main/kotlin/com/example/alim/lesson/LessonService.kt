@@ -30,6 +30,8 @@ class LessonService(
 			trackId = resolveTrackId(input.trackId),
 			orderInTrack = input.orderInTrack,
 			title = input.title.trim(),
+			description = input.description.trim(),
+			backgroundImg = input.backgroundImg.trim(),
 			parentNote = input.parentNote.trim(),
 			contentVersion = input.contentVersion.trim().ifEmpty { "1" },
 			steps = input.steps.map { it.normalized() },
@@ -47,6 +49,8 @@ class LessonService(
 			trackId = resolveTrackId(input.trackId),
 			orderInTrack = input.orderInTrack,
 			title = input.title.trim(),
+			description = input.description.trim(),
+			backgroundImg = input.backgroundImg.trim(),
 			parentNote = input.parentNote.trim(),
 			contentVersion = input.contentVersion.trim().ifEmpty { existing.contentVersion },
 			steps = input.steps.map { it.normalized() },
@@ -82,6 +86,9 @@ class LessonService(
 		}
 		if (input.parentNote.isBlank()) {
 			throw InvalidLessonDataException("parentNote is required")
+		}
+		if (input.description.isBlank()) {
+			throw InvalidLessonDataException("description is required")
 		}
 		if (input.steps.size !in MIN_STEPS..MAX_STEPS) {
 			throw InvalidLessonDataException("steps must contain $MIN_STEPS to $MAX_STEPS items")
@@ -129,6 +136,8 @@ data class LessonWriteInput(
 	val trackId: String,
 	val orderInTrack: Int,
 	val title: String,
+	val description: String,
+	val backgroundImg: String,
 	val parentNote: String,
 	val contentVersion: String = "1",
 	val steps: List<LessonStepInput>,

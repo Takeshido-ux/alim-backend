@@ -15,6 +15,8 @@ data class Lesson(
 	val trackId: String,
 	val orderInTrack: Int,
 	val title: String,
+	val description: String,
+	val backgroundImg: String,
 	val parentNote: String,
 	val contentVersion: String,
 	val steps: List<LessonStep>,

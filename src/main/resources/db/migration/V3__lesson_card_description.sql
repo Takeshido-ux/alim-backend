@@ -1,0 +1,2 @@
+ALTER TABLE lessons
+    ADD COLUMN description TEXT NOT NULL DEFAULT '';

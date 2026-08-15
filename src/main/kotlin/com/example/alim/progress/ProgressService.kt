@@ -337,6 +337,8 @@ class ProgressService(
 					lessonId = lesson.id,
 					slug = lesson.slug,
 					title = lesson.title,
+					description = lesson.description,
+					backgroundImg = lesson.backgroundImg,
 					orderInTrack = lesson.orderInTrack,
 					status = status,
 				)
@@ -432,6 +434,8 @@ data class PathLesson(
 	val lessonId: String,
 	val slug: String,
 	val title: String,
+	val description: String,
+	val backgroundImg: String,
 	val orderInTrack: Int,
 	val status: String,
 )
