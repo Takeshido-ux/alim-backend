@@ -9,6 +9,8 @@ interface UserRepository {
 
 	fun findById(id: String): UserAccount?
 
+	fun findAll(): List<UserAccount>
+
 	fun saveIfAbsent(user: UserAccount): Boolean
 
 	fun update(user: UserAccount)
@@ -23,6 +25,9 @@ class InMemoryUserRepository : UserRepository {
 	override fun findByPhoneNumber(phoneNumber: String): UserAccount? = usersByPhone[phoneNumber]
 
 	override fun findById(id: String): UserAccount? = usersById[id]
+
+	override fun findAll(): List<UserAccount> =
+		usersById.values.sortedByDescending { it.createdAt }
 
 	override fun saveIfAbsent(user: UserAccount): Boolean {
 		val previous = usersByPhone.putIfAbsent(user.phoneNumber, user)

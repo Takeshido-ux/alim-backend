@@ -1,6 +1,7 @@
 package com.example.alim.auth
 
 import com.example.alim.parent.FamilyPreferences
+import com.example.alim.persistence.toTimestamp
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.jdbc.core.RowMapper
@@ -16,6 +17,7 @@ class JdbcUserRepository(
 			id = rs.getString("id"),
 			phoneNumber = rs.getString("phone_number"),
 			pinHash = rs.getString("pin_hash"),
+			createdAt = rs.getTimestamp("created_at").toInstant(),
 			activeChildId = rs.getString("active_child_id"),
 			preferences = FamilyPreferences(
 				uiLanguage = rs.getString("ui_language"),
@@ -29,7 +31,7 @@ class JdbcUserRepository(
 	override fun findByPhoneNumber(phoneNumber: String): UserAccount? =
 		jdbc.query(
 			"""
-			SELECT id, phone_number, pin_hash, active_child_id,
+			SELECT id, phone_number, pin_hash, created_at, active_child_id,
 			       ui_language, voice_language, reminders_enabled, daily_lesson_goal
 			FROM parent_accounts
 			WHERE phone_number = ?
@@ -41,7 +43,7 @@ class JdbcUserRepository(
 	override fun findById(id: String): UserAccount? =
 		jdbc.query(
 			"""
-			SELECT id, phone_number, pin_hash, active_child_id,
+			SELECT id, phone_number, pin_hash, created_at, active_child_id,
 			       ui_language, voice_language, reminders_enabled, daily_lesson_goal
 			FROM parent_accounts
 			WHERE id = ?
@@ -50,18 +52,30 @@ class JdbcUserRepository(
 			id,
 		).firstOrNull()
 
+	override fun findAll(): List<UserAccount> =
+		jdbc.query(
+			"""
+			SELECT id, phone_number, pin_hash, created_at, active_child_id,
+			       ui_language, voice_language, reminders_enabled, daily_lesson_goal
+			FROM parent_accounts
+			ORDER BY created_at DESC
+			""".trimIndent(),
+			mapper,
+		)
+
 	override fun saveIfAbsent(user: UserAccount): Boolean {
 		val updated = jdbc.update(
 			"""
 			INSERT INTO parent_accounts (
-				id, phone_number, pin_hash, active_child_id,
+				id, phone_number, pin_hash, created_at, active_child_id,
 				ui_language, voice_language, reminders_enabled, daily_lesson_goal
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (phone_number) DO NOTHING
 			""".trimIndent(),
 			user.id,
 			user.phoneNumber,
 			user.pinHash,
+			user.createdAt.toTimestamp(),
 			user.activeChildId,
 			user.preferences.uiLanguage,
 			user.preferences.voiceLanguage,

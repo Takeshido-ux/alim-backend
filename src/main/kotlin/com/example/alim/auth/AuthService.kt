@@ -3,6 +3,7 @@ package com.example.alim.auth
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Service
+import java.time.Instant
 import java.util.UUID
 
 @Service
@@ -48,6 +49,7 @@ class AuthService(
 			id = UUID.randomUUID().toString(),
 			phoneNumber = phoneNumber,
 			pinHash = checkNotNull(passwordEncoder.encode(pin)),
+			createdAt = Instant.now(),
 		)
 
 	private fun requireDevAccessOrSms() {

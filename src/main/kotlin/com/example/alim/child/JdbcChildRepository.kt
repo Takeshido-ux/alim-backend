@@ -35,6 +35,18 @@ class JdbcChildRepository(
 			id,
 		).firstOrNull()
 
+	override fun findByParentId(parentId: String): List<ChildProfile> =
+		jdbc.query(
+			"""
+			SELECT id, parent_id, name, age, avatar_id, created_at, archived_at
+			FROM children
+			WHERE parent_id = ?
+			ORDER BY created_at
+			""".trimIndent(),
+			mapper,
+			parentId,
+		)
+
 	override fun findActiveByParentId(parentId: String): List<ChildProfile> =
 		jdbc.query(
 			"""
