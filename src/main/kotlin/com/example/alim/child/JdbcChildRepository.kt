@@ -82,4 +82,7 @@ class JdbcChildRepository(
 		)
 		return child
 	}
+
+	override fun deleteById(id: String): Boolean =
+		jdbc.update("DELETE FROM children WHERE id = ?", id) > 0
 }

@@ -4,16 +4,21 @@ import com.example.alim.auth.UserAccount
 import com.example.alim.auth.UserRepository
 import com.example.alim.child.ChildProfile
 import com.example.alim.child.ChildRepository
+import com.example.alim.child.ChildNotFoundException
 import com.example.alim.lesson.LessonService
 import com.example.alim.parent.FamilyPreferences
 import com.example.alim.progress.LessonProgress
 import com.example.alim.progress.LessonProgressStatus
 import com.example.alim.progress.ProgressRepository
 import com.example.alim.sticker.StickerService
+import org.springframework.http.HttpStatus
 import org.springframework.stereotype.Service
 import org.springframework.web.bind.annotation.GetMapping
+import org.springframework.web.bind.annotation.DeleteMapping
 import org.springframework.web.bind.annotation.PathVariable
+import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestMapping
+import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
 
@@ -95,6 +100,24 @@ class AdminUserController(
 
 	@GetMapping("/{id}")
 	fun get(@PathVariable id: String): AdminUserDetailsResponse = adminUserService.get(id)
+
+	@DeleteMapping("/{id}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	fun delete(@PathVariable id: String) {
+		adminUserService.delete(id)
+	}
+
+	@DeleteMapping("/children/{childId}")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	fun deleteChild(@PathVariable childId: String) {
+		adminUserService.deleteChild(childId)
+	}
+
+	@PostMapping("/children/{childId}/reset-progress")
+	@ResponseStatus(HttpStatus.NO_CONTENT)
+	fun resetChildProgress(@PathVariable childId: String) {
+		adminUserService.resetChildProgress(childId)
+	}
 }
 
 @Service
@@ -140,6 +163,32 @@ class AdminUserService(
 				)
 			},
 		)
+	}
+
+	fun delete(id: String) {
+		val user = userRepository.findById(id) ?: throw AdminUserNotFoundException()
+		childRepository.findByParentId(user.id).forEach { child ->
+			progressRepository.deleteByChildId(child.id)
+			childRepository.deleteById(child.id)
+		}
+		userRepository.deleteById(user.id)
+	}
+
+	fun deleteChild(childId: String) {
+		val child = childRepository.findById(childId) ?: throw ChildNotFoundException()
+		val parent = userRepository.findById(child.parentId)
+		if (parent?.activeChildId == childId) {
+			userRepository.update(parent.copy(activeChildId = null))
+		}
+		progressRepository.deleteByChildId(child.id)
+		childRepository.deleteById(child.id)
+	}
+
+	fun resetChildProgress(childId: String) {
+		if (childRepository.findById(childId) == null) {
+			throw ChildNotFoundException()
+		}
+		progressRepository.deleteByChildId(childId)
 	}
 
 	private fun ChildProfile.toResponse(

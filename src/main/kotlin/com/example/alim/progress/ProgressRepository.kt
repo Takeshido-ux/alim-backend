@@ -14,6 +14,8 @@ interface ProgressRepository {
 	fun findWallet(childId: String): RewardWallet?
 
 	fun saveWallet(wallet: RewardWallet): RewardWallet
+
+	fun deleteByChildId(childId: String)
 }
 
 @Repository
@@ -40,5 +42,10 @@ class InMemoryProgressRepository : ProgressRepository {
 	override fun saveWallet(wallet: RewardWallet): RewardWallet {
 		wallets[wallet.childId] = wallet
 		return wallet
+	}
+
+	override fun deleteByChildId(childId: String) {
+		progress.entries.removeIf { (_, item) -> item.childId == childId }
+		wallets.remove(childId)
 	}
 }

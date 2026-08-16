@@ -14,6 +14,8 @@ interface UserRepository {
 	fun saveIfAbsent(user: UserAccount): Boolean
 
 	fun update(user: UserAccount)
+
+	fun deleteById(id: String): Boolean
 }
 
 @Repository
@@ -44,5 +46,11 @@ class InMemoryUserRepository : UserRepository {
 		usersByPhone[user.phoneNumber] = user
 		usersById.remove(existing.id)
 		usersById[user.id] = user
+	}
+
+	override fun deleteById(id: String): Boolean {
+		val user = usersById.remove(id) ?: return false
+		usersByPhone.remove(user.phoneNumber, user)
+		return true
 	}
 }

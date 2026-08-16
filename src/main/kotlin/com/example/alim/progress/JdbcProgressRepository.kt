@@ -161,4 +161,10 @@ class JdbcProgressRepository(
 		}
 		return wallet
 	}
+
+	@Transactional
+	override fun deleteByChildId(childId: String) {
+		jdbc.update("DELETE FROM lesson_progress WHERE child_id = ?", childId)
+		jdbc.update("DELETE FROM reward_wallets WHERE child_id = ?", childId)
+	}
 }

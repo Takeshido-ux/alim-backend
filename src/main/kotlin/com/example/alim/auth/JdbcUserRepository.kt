@@ -109,4 +109,7 @@ class JdbcUserRepository(
 		)
 		check(updated > 0) { "Parent account not found: ${user.id}" }
 	}
+
+	override fun deleteById(id: String): Boolean =
+		jdbc.update("DELETE FROM parent_accounts WHERE id = ?", id) > 0
 }

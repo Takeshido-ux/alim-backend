@@ -12,6 +12,8 @@ interface ChildRepository {
 	fun findActiveByParentId(parentId: String): List<ChildProfile>
 
 	fun save(child: ChildProfile): ChildProfile
+
+	fun deleteById(id: String): Boolean
 }
 
 @Repository
@@ -35,4 +37,6 @@ class InMemoryChildRepository : ChildRepository {
 		children[child.id] = child
 		return child
 	}
+
+	override fun deleteById(id: String): Boolean = children.remove(id) != null
 }
