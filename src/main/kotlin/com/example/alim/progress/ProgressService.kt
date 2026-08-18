@@ -141,10 +141,10 @@ class ProgressService(
 			completedStepIds.size >= lesson.steps.size
 		val firstTry = input.firstTryPracticeCorrect ?: existing?.firstTryPracticeCorrect ?: true
 		val stars = when {
-			allStepsDone && firstTry -> 3
-			allStepsDone -> 2
-			else -> 1
-		}.coerceIn(1, 3)
+			allStepsDone && firstTry -> 60
+			allStepsDone -> 40
+			else -> 20
+		}.coerceIn(20, 60)
 
 		val progress = LessonProgress(
 			childId = childId,
