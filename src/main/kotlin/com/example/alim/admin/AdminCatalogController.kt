@@ -161,7 +161,6 @@ class AdminCatalogService(
 				put(it.slug, it)
 			}
 		}
-		val lessonOrders = snapshot.lessons.map { it.trackId to it.orderInTrack }.toSet()
 		requireUnique(snapshot.lessons.map { it.trackId to it.orderInTrack }, "lesson order within track")
 
 		snapshot.tracks.forEachIndexed { index, track ->
@@ -169,14 +168,9 @@ class AdminCatalogService(
 			requireIdentifier(track.slug, "tracks[$index].slug", 128)
 			if (track.order < 1) invalid("tracks[$index].order must be >= 1")
 			if (track.title.isBlank()) invalid("tracks[$index].title is required")
-			if (track.description.isBlank()) invalid("tracks[$index].description is required")
 			if (!HEX_COLOR.matches(track.iconColor)) invalid("tracks[$index].iconColor must be a #RRGGBB value")
-			if (track.backgroundImg.isBlank()) invalid("tracks[$index].backgroundImg is required")
 			track.stickerMilestones.forEach { (lessonOrder, stickerRef) ->
 				if (lessonOrder < 1) invalid("tracks[$index].stickerMilestones keys must be >= 1")
-				if ((track.id to lessonOrder) !in lessonOrders) {
-					invalid("tracks[$index].stickerMilestones references missing lesson order $lessonOrder")
-				}
 				if (stickerRef !in stickersByRef) {
 					invalid("tracks[$index].stickerMilestones references missing sticker: $stickerRef")
 				}
@@ -189,8 +183,6 @@ class AdminCatalogService(
 			if (lesson.trackId !in tracksById) invalid("lessons[$index].trackId does not exist: ${lesson.trackId}")
 			if (lesson.orderInTrack < 1) invalid("lessons[$index].orderInTrack must be >= 1")
 			if (lesson.title.isBlank()) invalid("lessons[$index].title is required")
-			if (lesson.description.isBlank()) invalid("lessons[$index].description is required")
-			if (lesson.parentNote.isBlank()) invalid("lessons[$index].parentNote is required")
 			if (lesson.contentVersion.isBlank()) invalid("lessons[$index].contentVersion is required")
 			if (lesson.steps.size !in MIN_STEPS..MAX_STEPS) {
 				invalid("lessons[$index].steps must contain $MIN_STEPS to $MAX_STEPS items")
