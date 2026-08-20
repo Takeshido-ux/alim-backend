@@ -18,8 +18,9 @@ class LessonService(
 		lessonRepository.findById(id) ?: throw LessonNotFoundException()
 
 	fun create(input: LessonWriteInput): Lesson {
-		validate(input)
-		val slug = SlugGenerator.unique(SlugGenerator.fromTitle(input.title)) { candidate ->
+		val normalized = input.normalized()
+		validate(normalized)
+		val slug = SlugGenerator.unique(SlugGenerator.fromTitle(normalized.title)) { candidate ->
 			lessonRepository.findBySlug(candidate) != null
 		}
 
@@ -27,14 +28,14 @@ class LessonService(
 		val lesson = Lesson(
 			id = UUID.randomUUID().toString(),
 			slug = slug,
-			trackId = resolveTrackId(input.trackId),
-			orderInTrack = input.orderInTrack,
-			title = input.title.trim(),
-			description = input.description.trim(),
-			backgroundImg = input.backgroundImg.trim(),
-			parentNote = input.parentNote.trim(),
-			contentVersion = input.contentVersion.trim().ifEmpty { "1" },
-			steps = input.steps.map { it.normalized() },
+			trackId = resolveTrackId(normalized.trackId),
+			orderInTrack = normalized.orderInTrack,
+			title = normalized.title,
+			description = normalized.description,
+			backgroundImg = normalized.backgroundImg,
+			parentNote = normalized.parentNote,
+			contentVersion = normalized.contentVersion.ifEmpty { "1" },
+			steps = normalized.steps.map { it.toStep() },
 			createdAt = now,
 			updatedAt = now,
 		)
@@ -43,17 +44,18 @@ class LessonService(
 
 	fun update(id: String, input: LessonWriteInput): Lesson {
 		val existing = getById(id)
-		validate(input)
+		val normalized = input.normalized()
+		validate(normalized)
 
 		val updated = existing.copy(
-			trackId = resolveTrackId(input.trackId),
-			orderInTrack = input.orderInTrack,
-			title = input.title.trim(),
-			description = input.description.trim(),
-			backgroundImg = input.backgroundImg.trim(),
-			parentNote = input.parentNote.trim(),
-			contentVersion = input.contentVersion.trim().ifEmpty { existing.contentVersion },
-			steps = input.steps.map { it.normalized() },
+			trackId = resolveTrackId(normalized.trackId),
+			orderInTrack = normalized.orderInTrack,
+			title = normalized.title,
+			description = normalized.description,
+			backgroundImg = normalized.backgroundImg,
+			parentNote = normalized.parentNote,
+			contentVersion = normalized.contentVersion.ifEmpty { existing.contentVersion },
+			steps = normalized.steps.map { it.toStep() },
 			updatedAt = Instant.now(),
 		)
 		return lessonRepository.save(updated)
@@ -110,19 +112,47 @@ class LessonService(
 		}
 	}
 
-	private fun LessonStepInput.normalized(): LessonStep =
+	private fun LessonStepInput.toStep(): LessonStep =
 		LessonStep(
-			stepId = stepId.trim(),
-			type = type.trim(),
+			stepId = stepId,
+			type = type,
 			payload = payload,
-			assets = assets.map { it.trim() }.filter { it.isNotEmpty() },
+			assets = assets,
 		)
 
 	private companion object {
 		const val MIN_STEPS = 4
 		const val MAX_STEPS = 7
-		val ALLOWED_STEP_TYPES = setOf("listen", "show", "repeat", "order", "choose_good", "video")
+		val ALLOWED_STEP_TYPES = setOf("listen", "show", "repeat", "order", "video")
 	}
+}
+
+private fun LessonWriteInput.normalized(): LessonWriteInput {
+	val usedStepIds = steps.mapTo(mutableSetOf()) { it.stepId.trim() }.apply { remove("") }
+	return copy(
+		trackId = trackId.trim(),
+		title = title.trim(),
+		description = description.trim(),
+		backgroundImg = backgroundImg.trim(),
+		parentNote = parentNote.trim(),
+		contentVersion = contentVersion.trim(),
+		steps = steps.map { step ->
+			val stepId = if (step.stepId.isNotBlank()) {
+				step.stepId.trim()
+			} else {
+				var generated: String
+				do {
+					generated = UUID.randomUUID().toString()
+				} while (!usedStepIds.add(generated))
+				generated
+			}
+			step.copy(
+				stepId = stepId,
+				type = if (step.type.trim() == "choose_good") "show" else step.type.trim(),
+				assets = step.assets.map(String::trim).filter(String::isNotEmpty),
+			)
+		},
+	)
 }
 
 data class LessonStepInput(

@@ -239,7 +239,7 @@ class ProgressService(
 
 		val steps = completed.flatMap { lesson ->
 			lesson.steps
-				.filter { it.type in setOf("repeat", "show", "choose_good", "listen") }
+				.filter { it.type in setOf("repeat", "show", "listen") }
 				.take(1)
 				.map { step ->
 					ReviewStep(

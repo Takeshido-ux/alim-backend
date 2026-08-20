@@ -16,6 +16,7 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.RestController
 import java.time.Instant
+import java.util.UUID
 
 data class AdminCatalogSnapshot(
 	val tracks: List<AdminCatalogTrack>,
@@ -52,7 +53,7 @@ data class AdminCatalogLesson(
 )
 
 data class AdminCatalogLessonStep(
-	val stepId: String,
+	val stepId: String = "",
 	val type: String,
 	val payload: Map<String, Any?> = emptyMap(),
 	val assets: List<String> = emptyList(),
@@ -239,7 +240,7 @@ class AdminCatalogService(
 		const val MIN_STEPS = 4
 		const val MAX_STEPS = 7
 		val HEX_COLOR = Regex("^#[0-9A-Fa-f]{6}$")
-		val ALLOWED_STEP_TYPES = setOf("listen", "show", "repeat", "order", "choose_good", "video")
+		val ALLOWED_STEP_TYPES = setOf("listen", "show", "repeat", "order", "video")
 	}
 }
 
@@ -267,10 +268,10 @@ private fun AdminCatalogSnapshot.normalized() = AdminCatalogSnapshot(
 			backgroundImg = it.backgroundImg.trim(),
 			parentNote = it.parentNote.trim(),
 			contentVersion = it.contentVersion.trim(),
-			steps = it.steps.map { step ->
+			steps = it.steps.withGeneratedIds().map { step ->
 				step.copy(
 					stepId = step.stepId.trim(),
-					type = step.type.trim(),
+					type = step.type.trim().replaceLegacyStepType(),
 					assets = step.assets.map(String::trim).filter(String::isNotEmpty),
 				)
 			},
@@ -280,6 +281,23 @@ private fun AdminCatalogSnapshot.normalized() = AdminCatalogSnapshot(
 		it.copy(id = it.id.trim(), slug = it.slug.trim(), title = it.title.trim())
 	},
 )
+
+private fun List<AdminCatalogLessonStep>.withGeneratedIds(): List<AdminCatalogLessonStep> {
+	val usedIds = mapTo(mutableSetOf()) { it.stepId.trim() }.apply { remove("") }
+	return map { step ->
+		if (step.stepId.isNotBlank()) {
+			step
+		} else {
+			var generated: String
+			do {
+				generated = UUID.randomUUID().toString()
+			} while (!usedIds.add(generated))
+			step.copy(stepId = generated)
+		}
+	}
+}
+
+private fun String.replaceLegacyStepType(): String = if (this == "choose_good") "show" else this
 
 private fun AdminCatalogTrack.toEntity(existing: Track?, now: Instant): Track =
 	Track(

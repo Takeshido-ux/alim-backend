@@ -18,8 +18,7 @@ import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
 
 data class LessonStepRequest(
-	@field:NotBlank(message = "stepId is required")
-	val stepId: String,
+	val stepId: String = "",
 	@field:NotBlank(message = "type is required")
 	val type: String,
 	val payload: Map<String, Any?> = emptyMap(),
