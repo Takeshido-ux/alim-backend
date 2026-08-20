@@ -2,6 +2,7 @@ package com.example.alim.auth
 
 import com.example.alim.admin.InvalidAdminCredentialsException
 import com.example.alim.admin.AdminUserNotFoundException
+import com.example.alim.admin.InvalidAdminCatalogException
 import com.example.alim.child.ChildNotFoundException
 import com.example.alim.child.InvalidChildDataException
 import com.example.alim.lesson.InvalidLessonDataException
@@ -48,6 +49,10 @@ class RestExceptionHandler {
 	@ExceptionHandler(AdminUserNotFoundException::class)
 	fun handleAdminUserNotFound(): ResponseEntity<ApiError> =
 		error(HttpStatus.NOT_FOUND, "user_not_found", "User was not found")
+
+	@ExceptionHandler(InvalidAdminCatalogException::class)
+	fun handleInvalidAdminCatalog(exception: InvalidAdminCatalogException): ResponseEntity<ApiError> =
+		error(HttpStatus.BAD_REQUEST, "invalid_admin_catalog", exception.message)
 
 	@ExceptionHandler(InvalidPhoneNumberException::class)
 	fun handleInvalidPhoneNumber(): ResponseEntity<ApiError> =

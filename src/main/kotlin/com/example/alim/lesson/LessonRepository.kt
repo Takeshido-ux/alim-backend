@@ -14,6 +14,8 @@ interface LessonRepository {
 	fun save(lesson: Lesson): Lesson
 
 	fun deleteById(id: String): Boolean
+
+	fun deleteByIds(ids: Collection<String>): Int
 }
 
 @Repository
@@ -47,4 +49,7 @@ class InMemoryLessonRepository : LessonRepository {
 		lessonIdsBySlug.remove(removed.slug)
 		return true
 	}
+
+	override fun deleteByIds(ids: Collection<String>): Int =
+		ids.count { deleteById(it) }
 }

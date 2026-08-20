@@ -14,6 +14,8 @@ interface StickerRepository {
 	fun save(sticker: Sticker): Sticker
 
 	fun deleteById(id: String): Boolean
+
+	fun deleteByIds(ids: Collection<String>): Int
 }
 
 @Repository
@@ -45,4 +47,7 @@ class InMemoryStickerRepository : StickerRepository {
 		stickerIdsBySlug.remove(removed.slug)
 		return true
 	}
+
+	override fun deleteByIds(ids: Collection<String>): Int =
+		ids.count { deleteById(it) }
 }

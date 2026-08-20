@@ -14,6 +14,8 @@ interface TrackRepository {
 	fun save(track: Track): Track
 
 	fun deleteById(id: String): Boolean
+
+	fun deleteByIds(ids: Collection<String>): Int
 }
 
 @Repository
@@ -45,4 +47,7 @@ class InMemoryTrackRepository : TrackRepository {
 		trackIdsBySlug.remove(removed.slug)
 		return true
 	}
+
+	override fun deleteByIds(ids: Collection<String>): Int =
+		ids.count { deleteById(it) }
 }

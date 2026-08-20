@@ -94,4 +94,7 @@ class JdbcTrackRepository(
 
 	override fun deleteById(id: String): Boolean =
 		jdbc.update("DELETE FROM tracks WHERE id = ?", id) > 0
+
+	override fun deleteByIds(ids: Collection<String>): Int =
+		ids.sumOf { id -> jdbc.update("DELETE FROM tracks WHERE id = ?", id) }
 }
