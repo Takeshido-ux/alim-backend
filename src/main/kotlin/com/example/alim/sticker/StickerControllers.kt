@@ -1,5 +1,6 @@
 package com.example.alim.sticker
 
+import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
@@ -12,17 +13,22 @@ import org.springframework.web.bind.annotation.RequestBody
 import org.springframework.web.bind.annotation.RequestMapping
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.bind.annotation.RestController
-import jakarta.validation.Valid
 
 data class StickerWriteRequest(
 	@field:NotBlank(message = "title is required")
 	val title: String,
+	@field:NotBlank(message = "description is required")
+	val description: String,
+	@field:NotBlank(message = "icon is required")
+	val icon: String,
 )
 
 data class StickerResponse(
 	val id: String,
 	val slug: String,
 	val title: String,
+	val description: String,
+	val icon: String,
 	val createdAt: String,
 	val updatedAt: String,
 )
@@ -35,6 +41,8 @@ data class CatalogStickerResponse(
 	val id: String,
 	val slug: String,
 	val title: String,
+	val description: String,
+	val icon: String,
 )
 
 data class CatalogStickerListResponse(
@@ -56,7 +64,7 @@ class AdminStickerController(
 
 	@PostMapping
 	fun create(@Valid @RequestBody request: StickerWriteRequest): ResponseEntity<StickerResponse> {
-		val sticker = stickerService.create(StickerWriteInput(request.title))
+		val sticker = stickerService.create(request.toInput())
 		return ResponseEntity.status(HttpStatus.CREATED).body(sticker.toResponse())
 	}
 
@@ -65,7 +73,7 @@ class AdminStickerController(
 		@PathVariable id: String,
 		@Valid @RequestBody request: StickerWriteRequest,
 	): StickerResponse =
-		stickerService.update(id, StickerWriteInput(request.title)).toResponse()
+		stickerService.update(id, request.toInput()).toResponse()
 
 	@DeleteMapping("/{id}")
 	@ResponseStatus(HttpStatus.NO_CONTENT)
@@ -93,6 +101,8 @@ private fun Sticker.toResponse() =
 		id = id,
 		slug = slug,
 		title = title,
+		description = description,
+		icon = icon,
 		createdAt = createdAt.toString(),
 		updatedAt = updatedAt.toString(),
 	)
@@ -102,4 +112,13 @@ private fun Sticker.toCatalogResponse() =
 		id = id,
 		slug = slug,
 		title = title,
+		description = description,
+		icon = icon,
+	)
+
+private fun StickerWriteRequest.toInput() =
+	StickerWriteInput(
+		title = title,
+		description = description,
+		icon = icon,
 	)

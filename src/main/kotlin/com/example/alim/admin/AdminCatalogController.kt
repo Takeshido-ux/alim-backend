@@ -1,5 +1,11 @@
 package com.example.alim.admin
 
+import com.example.alim.cartoon.Cartoon
+import com.example.alim.cartoon.CartoonEpisode
+import com.example.alim.cartoon.CartoonFavoriteRepository
+import com.example.alim.cartoon.CartoonRepository
+import com.example.alim.cartoon.CartoonTag
+import com.example.alim.cartoon.CartoonTagRepository
 import com.example.alim.lesson.Lesson
 import com.example.alim.lesson.LessonRepository
 import com.example.alim.lesson.LessonStep
@@ -22,6 +28,8 @@ data class AdminCatalogSnapshot(
 	val tracks: List<AdminCatalogTrack>,
 	val lessons: List<AdminCatalogLesson>,
 	val stickers: List<AdminCatalogSticker>,
+	val cartoonTags: List<AdminCatalogCartoonTag> = emptyList(),
+	val cartoons: List<AdminCatalogCartoon> = emptyList(),
 )
 
 data class AdminCatalogTrack(
@@ -63,6 +71,36 @@ data class AdminCatalogSticker(
 	val id: String,
 	val slug: String,
 	val title: String,
+	val description: String,
+	val icon: String,
+	val createdAt: String = "",
+	val updatedAt: String = "",
+)
+
+data class AdminCatalogCartoonTag(
+	val id: String,
+	val title: String,
+	val icon: String,
+	val createdAt: String = "",
+	val updatedAt: String = "",
+)
+
+data class AdminCatalogCartoonEpisode(
+	val id: String = "",
+	val title: String,
+	val description: String = "",
+	val img: String = "",
+	val video: String = "",
+)
+
+data class AdminCatalogCartoon(
+	val id: String,
+	val title: String,
+	val description: String = "",
+	val img: String = "",
+	val video: String = "",
+	val tagIds: List<String> = emptyList(),
+	val episodes: List<AdminCatalogCartoonEpisode> = emptyList(),
 	val createdAt: String = "",
 	val updatedAt: String = "",
 )
@@ -85,6 +123,9 @@ class AdminCatalogService(
 	private val trackRepository: TrackRepository,
 	private val lessonRepository: LessonRepository,
 	private val stickerRepository: StickerRepository,
+	private val cartoonTagRepository: CartoonTagRepository,
+	private val cartoonRepository: CartoonRepository,
+	private val cartoonFavoriteRepository: CartoonFavoriteRepository,
 ) {
 	private val snapshotLock = Any()
 
@@ -101,21 +142,32 @@ class AdminCatalogService(
 		val existingTracks = trackRepository.findAll()
 		val existingLessons = lessonRepository.findAll()
 		val existingStickers = stickerRepository.findAll()
+		val existingTags = cartoonTagRepository.findAll()
+		val existingCartoons = cartoonRepository.findAll()
 		validateStableSlugs(normalized, existingTracks, existingLessons, existingStickers)
 
 		val incomingTrackIds = normalized.tracks.mapTo(mutableSetOf()) { it.id }
 		val incomingLessonIds = normalized.lessons.mapTo(mutableSetOf()) { it.id }
 		val incomingStickerIds = normalized.stickers.mapTo(mutableSetOf()) { it.id }
+		val incomingTagIds = normalized.cartoonTags.mapTo(mutableSetOf()) { it.id }
+		val incomingCartoonIds = normalized.cartoons.mapTo(mutableSetOf()) { it.id }
 
 		// Child rows must be removed before their parents. Sticker FKs use cascade/set-null.
 		lessonRepository.deleteByIds(existingLessons.map { it.id }.filterNot(incomingLessonIds::contains))
 		trackRepository.deleteByIds(existingTracks.map { it.id }.filterNot(incomingTrackIds::contains))
 		stickerRepository.deleteByIds(existingStickers.map { it.id }.filterNot(incomingStickerIds::contains))
+		existingCartoons.map { it.id }.filterNot(incomingCartoonIds::contains).forEach { cartoonId ->
+			cartoonFavoriteRepository.deleteByCartoonId(cartoonId)
+			cartoonRepository.deleteById(cartoonId)
+		}
+		cartoonTagRepository.deleteByIds(existingTags.map { it.id }.filterNot(incomingTagIds::contains))
 
 		val now = Instant.now()
 		val tracksById = existingTracks.associateBy { it.id }
 		val lessonsById = existingLessons.associateBy { it.id }
 		val stickersById = existingStickers.associateBy { it.id }
+		val tagsById = existingTags.associateBy { it.id }
+		val cartoonsById = existingCartoons.associateBy { it.id }
 
 		// Parent/reference targets are upserted before lessons that point to tracks.
 		normalized.stickers.forEach { item ->
@@ -130,6 +182,14 @@ class AdminCatalogService(
 			val existing = lessonsById[item.id]
 			lessonRepository.save(item.toEntity(existing, now))
 		}
+		normalized.cartoonTags.forEach { item ->
+			val existing = tagsById[item.id]
+			cartoonTagRepository.save(item.toEntity(existing, now))
+		}
+		normalized.cartoons.forEach { item ->
+			val existing = cartoonsById[item.id]
+			cartoonRepository.save(item.toEntity(existing, now))
+		}
 
 		currentSnapshot()
 	}
@@ -143,6 +203,8 @@ class AdminCatalogService(
 				.sortedWith(compareBy({ trackOrder[it.trackId] ?: Int.MAX_VALUE }, { it.orderInTrack }, { it.slug }))
 				.map(Lesson::toSnapshot),
 			stickers = stickerRepository.findAll().map(Sticker::toSnapshot),
+			cartoonTags = cartoonTagRepository.findAll().map(CartoonTag::toSnapshot),
+			cartoons = cartoonRepository.findAll().map(Cartoon::toSnapshot),
 		)
 	}
 
@@ -201,6 +263,29 @@ class AdminCatalogService(
 			requireIdentifier(sticker.id, "stickers[$index].id", 36)
 			requireIdentifier(sticker.slug, "stickers[$index].slug", 128)
 			if (sticker.title.isBlank()) invalid("stickers[$index].title is required")
+			if (sticker.description.isBlank()) invalid("stickers[$index].description is required")
+			if (sticker.icon.isBlank()) invalid("stickers[$index].icon is required")
+		}
+
+		requireUnique(snapshot.cartoonTags.map { it.id }, "cartoon tag id")
+		requireUnique(snapshot.cartoons.map { it.id }, "cartoon id")
+		val tagIds = snapshot.cartoonTags.mapTo(mutableSetOf()) { it.id }
+		snapshot.cartoonTags.forEachIndexed { index, tag ->
+			requireIdentifier(tag.id, "cartoonTags[$index].id", 36)
+			if (tag.title.isBlank()) invalid("cartoonTags[$index].title is required")
+			if (tag.icon.isBlank()) invalid("cartoonTags[$index].icon is required")
+		}
+		snapshot.cartoons.forEachIndexed { index, cartoon ->
+			requireIdentifier(cartoon.id, "cartoons[$index].id", 36)
+			if (cartoon.title.isBlank()) invalid("cartoons[$index].title is required")
+			cartoon.tagIds.forEach { tagId ->
+				if (tagId !in tagIds) invalid("cartoons[$index].tagIds references missing tag: $tagId")
+			}
+			requireUnique(cartoon.episodes.map { it.id }, "episode id in cartoon ${cartoon.id}")
+			cartoon.episodes.forEachIndexed { episodeIndex, episode ->
+				if (episode.id.isBlank()) invalid("cartoons[$index].episodes[$episodeIndex].id is required")
+				if (episode.title.isBlank()) invalid("cartoons[$index].episodes[$episodeIndex].title is required")
+			}
 		}
 	}
 
@@ -278,7 +363,35 @@ private fun AdminCatalogSnapshot.normalized() = AdminCatalogSnapshot(
 		)
 	},
 	stickers = stickers.map {
-		it.copy(id = it.id.trim(), slug = it.slug.trim(), title = it.title.trim())
+		it.copy(
+			id = it.id.trim(),
+			slug = it.slug.trim(),
+			title = it.title.trim(),
+			description = it.description.trim(),
+			icon = it.icon.trim(),
+		)
+	},
+	cartoonTags = cartoonTags.map {
+		it.copy(id = it.id.trim(), title = it.title.trim(), icon = it.icon.trim())
+	},
+	cartoons = cartoons.map {
+		it.copy(
+			id = it.id.trim(),
+			title = it.title.trim(),
+			description = it.description.trim(),
+			img = it.img.trim(),
+			video = it.video.trim(),
+			tagIds = it.tagIds.map(String::trim).filter(String::isNotEmpty).distinct(),
+			episodes = it.episodes.withGeneratedEpisodeIds().map { episode ->
+				episode.copy(
+					id = episode.id.trim(),
+					title = episode.title.trim(),
+					description = episode.description.trim(),
+					img = episode.img.trim(),
+					video = episode.video.trim(),
+				)
+			},
+		)
 	},
 )
 
@@ -293,6 +406,21 @@ private fun List<AdminCatalogLessonStep>.withGeneratedIds(): List<AdminCatalogLe
 				generated = UUID.randomUUID().toString()
 			} while (!usedIds.add(generated))
 			step.copy(stepId = generated)
+		}
+	}
+}
+
+private fun List<AdminCatalogCartoonEpisode>.withGeneratedEpisodeIds(): List<AdminCatalogCartoonEpisode> {
+	val usedIds = mapTo(mutableSetOf()) { it.id.trim() }.apply { remove("") }
+	return map { episode ->
+		if (episode.id.isNotBlank()) {
+			episode
+		} else {
+			var generated: String
+			do {
+				generated = UUID.randomUUID().toString()
+			} while (!usedIds.add(generated))
+			episode.copy(id = generated)
 		}
 	}
 }
@@ -336,6 +464,38 @@ private fun AdminCatalogSticker.toEntity(existing: Sticker?, now: Instant): Stic
 		id = id,
 		slug = slug,
 		title = title,
+		description = description,
+		icon = icon,
+		createdAt = existing?.createdAt ?: now,
+		updatedAt = now,
+	)
+
+private fun AdminCatalogCartoonTag.toEntity(existing: CartoonTag?, now: Instant): CartoonTag =
+	CartoonTag(
+		id = id,
+		title = title,
+		icon = icon,
+		createdAt = existing?.createdAt ?: now,
+		updatedAt = now,
+	)
+
+private fun AdminCatalogCartoon.toEntity(existing: Cartoon?, now: Instant): Cartoon =
+	Cartoon(
+		id = id,
+		title = title,
+		description = description,
+		img = img,
+		video = video,
+		tagIds = tagIds,
+		episodes = episodes.map {
+			CartoonEpisode(
+				id = it.id,
+				title = it.title,
+				description = it.description,
+				img = it.img,
+				video = it.video,
+			)
+		},
 		createdAt = existing?.createdAt ?: now,
 		updatedAt = now,
 	)
@@ -370,4 +530,31 @@ private fun Lesson.toSnapshot() =
 		updatedAt = updatedAt.toString(),
 	)
 
-private fun Sticker.toSnapshot() = AdminCatalogSticker(id, slug, title, createdAt.toString(), updatedAt.toString())
+private fun Sticker.toSnapshot() =
+	AdminCatalogSticker(
+		id = id,
+		slug = slug,
+		title = title,
+		description = description,
+		icon = icon,
+		createdAt = createdAt.toString(),
+		updatedAt = updatedAt.toString(),
+	)
+
+private fun CartoonTag.toSnapshot() =
+	AdminCatalogCartoonTag(id, title, icon, createdAt.toString(), updatedAt.toString())
+
+private fun Cartoon.toSnapshot() =
+	AdminCatalogCartoon(
+		id = id,
+		title = title,
+		description = description,
+		img = img,
+		video = video,
+		tagIds = tagIds,
+		episodes = episodes.map {
+			AdminCatalogCartoonEpisode(it.id, it.title, it.description, it.img, it.video)
+		},
+		createdAt = createdAt.toString(),
+		updatedAt = updatedAt.toString(),
+	)

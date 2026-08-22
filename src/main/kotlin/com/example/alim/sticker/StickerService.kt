@@ -25,6 +25,8 @@ class StickerService(
 				id = UUID.randomUUID().toString(),
 				slug = slug,
 				title = input.title.trim(),
+				description = input.description.trim(),
+				icon = input.icon.trim(),
 				createdAt = now,
 				updatedAt = now,
 			),
@@ -37,6 +39,8 @@ class StickerService(
 		return stickerRepository.save(
 			existing.copy(
 				title = input.title.trim(),
+				description = input.description.trim(),
+				icon = input.icon.trim(),
 				updatedAt = Instant.now(),
 			),
 		)
@@ -52,6 +56,12 @@ class StickerService(
 		if (input.title.isBlank()) {
 			throw InvalidStickerDataException("title is required")
 		}
+		if (input.description.isBlank()) {
+			throw InvalidStickerDataException("description is required")
+		}
+		if (input.icon.isBlank()) {
+			throw InvalidStickerDataException("icon is required")
+		}
 	}
 }
 
@@ -62,6 +72,8 @@ private object SoftSlug {
 
 data class StickerWriteInput(
 	val title: String,
+	val description: String,
+	val icon: String,
 )
 
 class StickerNotFoundException : RuntimeException()

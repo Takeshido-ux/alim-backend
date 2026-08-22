@@ -4,6 +4,7 @@ import com.example.alim.child.ChildService
 import com.example.alim.lesson.Lesson
 import com.example.alim.lesson.LessonService
 import com.example.alim.parent.CurrentParentResolver
+import com.example.alim.sticker.Sticker
 import com.example.alim.sticker.StickerService
 import com.example.alim.track.Track
 import com.example.alim.track.TrackService
@@ -207,18 +208,30 @@ class ProgressService(
 	fun getRewards(childId: String): RewardsResult {
 		childService.requireOwnedChildForCurrentParent(childId)
 		val wallet = progressRepository.findWallet(childId) ?: RewardWallet(childId = childId)
-		val stickers = stickerService.list().map { sticker ->
-			RewardStickerItem(
+		val completedLessonIds = progressRepository.findByChildId(childId)
+			.filter { it.status == LessonProgressStatus.completed }
+			.mapTo(mutableSetOf()) { it.lessonId }
+		val tracks = trackService.list()
+		val lessons = lessonService.list()
+		val achievements = stickerService.list().map { sticker ->
+			AchievementItem(
 				id = sticker.id,
 				slug = sticker.slug,
+				icon = sticker.icon,
 				title = sticker.title,
-				earned = sticker.id in wallet.stickerIds,
+				description = sticker.description,
+				progress = achievementProgress(
+					sticker = sticker,
+					wallet = wallet,
+					completedLessonIds = completedLessonIds,
+					tracks = tracks,
+					lessons = lessons,
+				),
 			)
 		}
 		return RewardsResult(
 			totalStars = wallet.totalStars,
-			lastGrantedStickerId = wallet.lastGrantedStickerId,
-			stickers = stickers,
+			achievements = achievements,
 		)
 	}
 
@@ -397,6 +410,49 @@ class ProgressService(
 		)
 	}
 
+	private fun achievementProgress(
+		sticker: Sticker,
+		wallet: RewardWallet,
+		completedLessonIds: Set<String>,
+		tracks: List<Track>,
+		lessons: List<Lesson>,
+	): AchievementProgress {
+		if (sticker.slug == FIRST_STEP_STICKER_SLUG) {
+			return AchievementProgress(
+				current = completedLessonIds.size.coerceAtMost(1),
+				target = 1,
+			)
+		}
+
+		val milestone = tracks
+			.sortedBy(Track::order)
+			.firstNotNullOfOrNull { track ->
+				track.stickerMilestones.entries
+					.filter { (_, stickerReference) ->
+						stickerReference == sticker.id || stickerReference == sticker.slug
+					}
+					.minByOrNull { it.key }
+					?.let { entry -> track to entry.key.coerceAtLeast(1) }
+			}
+		if (milestone != null) {
+			val (track, target) = milestone
+			val current = lessons.count { lesson ->
+				(lesson.trackId == track.id || lesson.trackId == track.slug) &&
+					lesson.orderInTrack <= target &&
+					lesson.id in completedLessonIds
+			}
+			return AchievementProgress(
+				current = current.coerceAtMost(target),
+				target = target,
+			)
+		}
+
+		return AchievementProgress(
+			current = if (sticker.id in wallet.stickerIds) 1 else 0,
+			target = 1,
+		)
+	}
+
 	private companion object {
 		val REVIEW_TRACKS = setOf("adab", "dua")
 		const val FIRST_STEP_STICKER_SLUG = "first_step"
@@ -473,17 +529,23 @@ data class CompleteLessonResult(
 	val wallet: RewardWallet,
 )
 
-data class RewardStickerItem(
+data class AchievementProgress(
+	val current: Int,
+	val target: Int,
+)
+
+data class AchievementItem(
 	val id: String,
 	val slug: String,
+	val icon: String,
 	val title: String,
-	val earned: Boolean,
+	val description: String,
+	val progress: AchievementProgress,
 )
 
 data class RewardsResult(
 	val totalStars: Int,
-	val lastGrantedStickerId: String?,
-	val stickers: List<RewardStickerItem>,
+	val achievements: List<AchievementItem>,
 )
 
 data class ReviewStep(

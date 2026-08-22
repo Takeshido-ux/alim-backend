@@ -16,6 +16,8 @@ class JdbcStickerRepository(
 			id = rs.getString("id"),
 			slug = rs.getString("slug"),
 			title = rs.getString("title"),
+			description = rs.getString("description"),
+			icon = rs.getString("icon"),
 			createdAt = rs.getTimestamp("created_at").toInstant(),
 			updatedAt = rs.getTimestamp("updated_at").toInstant(),
 		)
@@ -24,7 +26,7 @@ class JdbcStickerRepository(
 	override fun findAll(): List<Sticker> =
 		jdbc.query(
 			"""
-			SELECT id, slug, title, created_at, updated_at
+			SELECT id, slug, title, description, icon, created_at, updated_at
 			FROM stickers
 			ORDER BY slug
 			""".trimIndent(),
@@ -34,7 +36,7 @@ class JdbcStickerRepository(
 	override fun findById(id: String): Sticker? =
 		jdbc.query(
 			"""
-			SELECT id, slug, title, created_at, updated_at
+			SELECT id, slug, title, description, icon, created_at, updated_at
 			FROM stickers
 			WHERE id = ?
 			""".trimIndent(),
@@ -45,7 +47,7 @@ class JdbcStickerRepository(
 	override fun findBySlug(slug: String): Sticker? =
 		jdbc.query(
 			"""
-			SELECT id, slug, title, created_at, updated_at
+			SELECT id, slug, title, description, icon, created_at, updated_at
 			FROM stickers
 			WHERE slug = ?
 			""".trimIndent(),
@@ -56,17 +58,21 @@ class JdbcStickerRepository(
 	override fun save(sticker: Sticker): Sticker {
 		jdbc.update(
 			"""
-			INSERT INTO stickers (id, slug, title, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?)
+			INSERT INTO stickers (id, slug, title, description, icon, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (id) DO UPDATE SET
 				slug = EXCLUDED.slug,
 				title = EXCLUDED.title,
+				description = EXCLUDED.description,
+				icon = EXCLUDED.icon,
 				created_at = EXCLUDED.created_at,
 				updated_at = EXCLUDED.updated_at
 			""".trimIndent(),
 			sticker.id,
 			sticker.slug,
 			sticker.title,
+			sticker.description,
+			sticker.icon,
 			sticker.createdAt.toTimestamp(),
 			sticker.updatedAt.toTimestamp(),
 		)

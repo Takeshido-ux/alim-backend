@@ -13,6 +13,8 @@ interface CartoonRepository {
 
 	fun deleteById(id: String): Boolean
 
+	fun deleteByIds(ids: Collection<String>): Int
+
 	fun removeTagFromAll(tagId: String)
 }
 
@@ -32,6 +34,9 @@ class InMemoryCartoonRepository : CartoonRepository {
 	}
 
 	override fun deleteById(id: String): Boolean = cartoonsById.remove(id) != null
+
+	override fun deleteByIds(ids: Collection<String>): Int =
+		ids.count { deleteById(it) }
 
 	override fun removeTagFromAll(tagId: String) {
 		cartoonsById.replaceAll { _, cartoon ->

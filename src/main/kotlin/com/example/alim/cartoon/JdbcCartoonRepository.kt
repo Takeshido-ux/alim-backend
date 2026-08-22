@@ -80,6 +80,9 @@ class JdbcCartoonRepository(
 	override fun deleteById(id: String): Boolean =
 		jdbc.update("DELETE FROM cartoons WHERE id = ?", id) > 0
 
+	override fun deleteByIds(ids: Collection<String>): Int =
+		ids.sumOf { id -> jdbc.update("DELETE FROM cartoons WHERE id = ?", id) }
+
 	override fun removeTagFromAll(tagId: String) {
 		val now = Instant.now()
 		findAll()
