@@ -30,4 +30,7 @@ class JsonColumns(
 
 	fun lessonSteps(json: String?): List<com.example.alim.lesson.LessonStep> =
 		fromJson(json, object : TypeReference<List<com.example.alim.lesson.LessonStep>>() {}, emptyList())
+
+	fun cartoonEpisodes(json: String?): List<com.example.alim.cartoon.CartoonEpisode> =
+		fromJson(json, object : TypeReference<List<com.example.alim.cartoon.CartoonEpisode>>() {}, emptyList())
 }

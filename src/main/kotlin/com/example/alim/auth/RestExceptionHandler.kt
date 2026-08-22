@@ -3,6 +3,9 @@ package com.example.alim.auth
 import com.example.alim.admin.InvalidAdminCredentialsException
 import com.example.alim.admin.AdminUserNotFoundException
 import com.example.alim.admin.InvalidAdminCatalogException
+import com.example.alim.cartoon.CartoonNotFoundException
+import com.example.alim.cartoon.CartoonTagNotFoundException
+import com.example.alim.cartoon.InvalidCartoonDataException
 import com.example.alim.child.ChildNotFoundException
 import com.example.alim.child.InvalidChildDataException
 import com.example.alim.lesson.InvalidLessonDataException
@@ -97,6 +100,18 @@ class RestExceptionHandler {
 	@ExceptionHandler(InvalidLessonDataException::class)
 	fun handleInvalidLessonData(exception: InvalidLessonDataException): ResponseEntity<ApiError> =
 		error(HttpStatus.BAD_REQUEST, "invalid_lesson_data", exception.message)
+
+	@ExceptionHandler(CartoonNotFoundException::class)
+	fun handleCartoonNotFound(): ResponseEntity<ApiError> =
+		error(HttpStatus.NOT_FOUND, "cartoon_not_found", "Cartoon was not found")
+
+	@ExceptionHandler(CartoonTagNotFoundException::class)
+	fun handleCartoonTagNotFound(): ResponseEntity<ApiError> =
+		error(HttpStatus.NOT_FOUND, "cartoon_tag_not_found", "Cartoon tag was not found")
+
+	@ExceptionHandler(InvalidCartoonDataException::class)
+	fun handleInvalidCartoonData(exception: InvalidCartoonDataException): ResponseEntity<ApiError> =
+		error(HttpStatus.BAD_REQUEST, "invalid_cartoon_data", exception.message)
 
 	@ExceptionHandler(TrackNotFoundException::class)
 	fun handleTrackNotFound(): ResponseEntity<ApiError> =
