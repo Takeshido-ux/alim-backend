@@ -27,6 +27,7 @@ data class LessonProgress(
 data class RewardWallet(
 	val childId: String,
 	val totalStars: Int = 0,
-	val stickerIds: Set<String> = emptySet(),
-	val lastGrantedStickerId: String? = null,
+	val achievementIds: Set<String> = emptySet(),
+	val achievementUnlockedAt: Map<String, Instant> = emptyMap(),
+	val lastGrantedAchievementId: String? = null,
 )

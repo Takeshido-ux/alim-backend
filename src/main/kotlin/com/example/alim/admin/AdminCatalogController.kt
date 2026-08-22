@@ -9,6 +9,9 @@ import com.example.alim.cartoon.CartoonTagRepository
 import com.example.alim.lesson.Lesson
 import com.example.alim.lesson.LessonRepository
 import com.example.alim.lesson.LessonStep
+import com.example.alim.sticker.AchievementMetric
+import com.example.alim.sticker.AchievementRule
+import com.example.alim.sticker.AchievementScopeType
 import com.example.alim.sticker.Sticker
 import com.example.alim.sticker.StickerRepository
 import com.example.alim.track.Track
@@ -27,7 +30,7 @@ import java.util.UUID
 data class AdminCatalogSnapshot(
 	val tracks: List<AdminCatalogTrack>,
 	val lessons: List<AdminCatalogLesson>,
-	val stickers: List<AdminCatalogSticker>,
+	val achievements: List<AdminCatalogSticker>,
 	val cartoonTags: List<AdminCatalogCartoonTag> = emptyList(),
 	val cartoons: List<AdminCatalogCartoon> = emptyList(),
 )
@@ -40,7 +43,6 @@ data class AdminCatalogTrack(
 	val description: String,
 	val iconColor: String,
 	val backgroundImg: String,
-	val stickerMilestones: Map<Int, String> = emptyMap(),
 	val createdAt: String = "",
 	val updatedAt: String = "",
 )
@@ -73,6 +75,9 @@ data class AdminCatalogSticker(
 	val title: String,
 	val description: String,
 	val icon: String,
+	val rule: AchievementRule,
+	val active: Boolean,
+	val order: Int,
 	val createdAt: String = "",
 	val updatedAt: String = "",
 )
@@ -148,7 +153,7 @@ class AdminCatalogService(
 
 		val incomingTrackIds = normalized.tracks.mapTo(mutableSetOf()) { it.id }
 		val incomingLessonIds = normalized.lessons.mapTo(mutableSetOf()) { it.id }
-		val incomingStickerIds = normalized.stickers.mapTo(mutableSetOf()) { it.id }
+		val incomingStickerIds = normalized.achievements.mapTo(mutableSetOf()) { it.id }
 		val incomingTagIds = normalized.cartoonTags.mapTo(mutableSetOf()) { it.id }
 		val incomingCartoonIds = normalized.cartoons.mapTo(mutableSetOf()) { it.id }
 
@@ -170,7 +175,7 @@ class AdminCatalogService(
 		val cartoonsById = existingCartoons.associateBy { it.id }
 
 		// Parent/reference targets are upserted before lessons that point to tracks.
-		normalized.stickers.forEach { item ->
+		normalized.achievements.forEach { item ->
 			val existing = stickersById[item.id]
 			stickerRepository.save(item.toEntity(existing, now))
 		}
@@ -202,7 +207,7 @@ class AdminCatalogService(
 			lessons = lessonRepository.findAll()
 				.sortedWith(compareBy({ trackOrder[it.trackId] ?: Int.MAX_VALUE }, { it.orderInTrack }, { it.slug }))
 				.map(Lesson::toSnapshot),
-			stickers = stickerRepository.findAll().map(Sticker::toSnapshot),
+			achievements = stickerRepository.findAll().map(Sticker::toSnapshot),
 			cartoonTags = cartoonTagRepository.findAll().map(CartoonTag::toSnapshot),
 			cartoons = cartoonRepository.findAll().map(Cartoon::toSnapshot),
 		)
@@ -214,16 +219,11 @@ class AdminCatalogService(
 		requireUnique(snapshot.tracks.map { it.order }, "track order")
 		requireUnique(snapshot.lessons.map { it.id }, "lesson id")
 		requireUnique(snapshot.lessons.map { it.slug }, "lesson slug")
-		requireUnique(snapshot.stickers.map { it.id }, "sticker id")
-		requireUnique(snapshot.stickers.map { it.slug }, "sticker slug")
+		requireUnique(snapshot.achievements.map { it.id }, "achievement id")
+		requireUnique(snapshot.achievements.map { it.slug }, "achievement slug")
 
 		val tracksById = snapshot.tracks.associateBy { it.id }
-		val stickersByRef = buildMap {
-			snapshot.stickers.forEach {
-				put(it.id, it)
-				put(it.slug, it)
-			}
-		}
+		val lessonIds = snapshot.lessons.mapTo(mutableSetOf()) { it.id }
 		requireUnique(snapshot.lessons.map { it.trackId to it.orderInTrack }, "lesson order within track")
 
 		snapshot.tracks.forEachIndexed { index, track ->
@@ -232,12 +232,6 @@ class AdminCatalogService(
 			if (track.order < 1) invalid("tracks[$index].order must be >= 1")
 			if (track.title.isBlank()) invalid("tracks[$index].title is required")
 			if (!HEX_COLOR.matches(track.iconColor)) invalid("tracks[$index].iconColor must be a #RRGGBB value")
-			track.stickerMilestones.forEach { (lessonOrder, stickerRef) ->
-				if (lessonOrder < 1) invalid("tracks[$index].stickerMilestones keys must be >= 1")
-				if (stickerRef !in stickersByRef) {
-					invalid("tracks[$index].stickerMilestones references missing sticker: $stickerRef")
-				}
-			}
 		}
 
 		snapshot.lessons.forEachIndexed { index, lesson ->
@@ -259,12 +253,47 @@ class AdminCatalogService(
 			}
 		}
 
-		snapshot.stickers.forEachIndexed { index, sticker ->
-			requireIdentifier(sticker.id, "stickers[$index].id", 36)
-			requireIdentifier(sticker.slug, "stickers[$index].slug", 128)
-			if (sticker.title.isBlank()) invalid("stickers[$index].title is required")
-			if (sticker.description.isBlank()) invalid("stickers[$index].description is required")
-			if (sticker.icon.isBlank()) invalid("stickers[$index].icon is required")
+		snapshot.achievements.forEachIndexed { index, sticker ->
+			requireIdentifier(sticker.id, "achievements[$index].id", 36)
+			requireIdentifier(sticker.slug, "achievements[$index].slug", 128)
+			if (sticker.title.isBlank()) invalid("achievements[$index].title is required")
+			if (sticker.description.isBlank()) invalid("achievements[$index].description is required")
+			if (sticker.icon.isBlank()) invalid("achievements[$index].icon is required")
+			if (sticker.order < 0) invalid("achievements[$index].order must be >= 0")
+			if (sticker.rule.target < 1) invalid("achievements[$index].rule.target must be >= 1")
+			if (sticker.rule.scopeType == AchievementScopeType.GLOBAL && sticker.rule.scopeId != null) {
+				invalid("achievements[$index].rule.scopeId must be null for GLOBAL scope")
+			}
+			if (sticker.rule.scopeType != AchievementScopeType.GLOBAL && sticker.rule.scopeId.isNullOrBlank()) {
+				invalid("achievements[$index].rule.scopeId is required")
+			}
+			when (sticker.rule.metric) {
+				AchievementMetric.LESSONS_COMPLETED -> when (sticker.rule.scopeType) {
+					AchievementScopeType.GLOBAL -> Unit
+					AchievementScopeType.TRACK -> if (sticker.rule.scopeId !in tracksById) {
+						invalid("achievements[$index].rule.scopeId references missing track")
+					}
+					AchievementScopeType.LESSON -> invalid("LESSONS_COMPLETED does not support LESSON scope")
+				}
+				AchievementMetric.TOTAL_STARS -> if (
+					sticker.rule.scopeType != AchievementScopeType.GLOBAL || sticker.rule.scopeId != null
+				) invalid("TOTAL_STARS requires GLOBAL scope")
+				AchievementMetric.TRACKS_COMPLETED -> when (sticker.rule.scopeType) {
+					AchievementScopeType.GLOBAL -> Unit
+					AchievementScopeType.TRACK -> {
+						if (sticker.rule.scopeId !in tracksById) invalid("rule references missing track")
+						if (sticker.rule.target != 1) invalid("specific track rule target must be 1")
+					}
+					AchievementScopeType.LESSON -> invalid("TRACKS_COMPLETED does not support LESSON scope")
+				}
+				AchievementMetric.SPECIFIC_LESSON_COMPLETED -> {
+					if (sticker.rule.scopeType != AchievementScopeType.LESSON) {
+						invalid("SPECIFIC_LESSON_COMPLETED requires LESSON scope")
+					}
+					if (sticker.rule.scopeId !in lessonIds) invalid("rule references missing lesson")
+					if (sticker.rule.target != 1) invalid("specific lesson rule target must be 1")
+				}
+			}
 		}
 
 		requireUnique(snapshot.cartoonTags.map { it.id }, "cartoon tag id")
@@ -297,7 +326,11 @@ class AdminCatalogService(
 	) {
 		requireStableSlugs(snapshot.tracks.associate { it.id to it.slug }, tracks.associate { it.id to it.slug }, "track")
 		requireStableSlugs(snapshot.lessons.associate { it.id to it.slug }, lessons.associate { it.id to it.slug }, "lesson")
-		requireStableSlugs(snapshot.stickers.associate { it.id to it.slug }, stickers.associate { it.id to it.slug }, "sticker")
+		requireStableSlugs(
+			snapshot.achievements.associate { it.id to it.slug },
+			stickers.associate { it.id to it.slug },
+			"achievement",
+		)
 	}
 
 	private fun requireStableSlugs(incoming: Map<String, String>, existing: Map<String, String>, entity: String) {
@@ -338,9 +371,8 @@ private fun AdminCatalogSnapshot.normalized() = AdminCatalogSnapshot(
 			slug = it.slug.trim(),
 			title = it.title.trim(),
 			description = it.description.trim(),
-			iconColor = it.iconColor.trim(),
-			backgroundImg = it.backgroundImg.trim(),
-			stickerMilestones = it.stickerMilestones.mapValues { (_, value) -> value.trim() },
+				iconColor = it.iconColor.trim(),
+				backgroundImg = it.backgroundImg.trim(),
 		)
 	},
 	lessons = lessons.map {
@@ -362,13 +394,14 @@ private fun AdminCatalogSnapshot.normalized() = AdminCatalogSnapshot(
 			},
 		)
 	},
-	stickers = stickers.map {
+	achievements = achievements.map {
 		it.copy(
 			id = it.id.trim(),
 			slug = it.slug.trim(),
 			title = it.title.trim(),
 			description = it.description.trim(),
 			icon = it.icon.trim(),
+			rule = it.rule.copy(scopeId = it.rule.scopeId?.trim()?.takeIf(String::isNotEmpty)),
 		)
 	},
 	cartoonTags = cartoonTags.map {
@@ -436,7 +469,6 @@ private fun AdminCatalogTrack.toEntity(existing: Track?, now: Instant): Track =
 		description = description,
 		iconColor = iconColor,
 		backgroundImg = backgroundImg,
-		stickerMilestones = stickerMilestones,
 		createdAt = existing?.createdAt ?: now,
 		updatedAt = now,
 	)
@@ -466,6 +498,9 @@ private fun AdminCatalogSticker.toEntity(existing: Sticker?, now: Instant): Stic
 		title = title,
 		description = description,
 		icon = icon,
+		rule = rule,
+		active = active,
+		order = order,
 		createdAt = existing?.createdAt ?: now,
 		updatedAt = now,
 	)
@@ -502,16 +537,15 @@ private fun AdminCatalogCartoon.toEntity(existing: Cartoon?, now: Instant): Cart
 
 private fun Track.toSnapshot() =
 	AdminCatalogTrack(
-		id,
-		slug,
-		order,
-		title,
-		description,
-		iconColor,
-		backgroundImg,
-		stickerMilestones,
-		createdAt.toString(),
-		updatedAt.toString(),
+		id = id,
+		slug = slug,
+		order = order,
+		title = title,
+		description = description,
+		iconColor = iconColor,
+		backgroundImg = backgroundImg,
+		createdAt = createdAt.toString(),
+		updatedAt = updatedAt.toString(),
 	)
 
 private fun Lesson.toSnapshot() =
@@ -537,6 +571,9 @@ private fun Sticker.toSnapshot() =
 		title = title,
 		description = description,
 		icon = icon,
+		rule = rule,
+		active = active,
+		order = order,
 		createdAt = createdAt.toString(),
 		updatedAt = updatedAt.toString(),
 	)

@@ -1,6 +1,8 @@
 package com.example.alim.lesson
 
 import com.example.alim.common.SlugGenerator
+import com.example.alim.sticker.AchievementScopeType
+import com.example.alim.sticker.StickerRepository
 import com.example.alim.track.TrackNotFoundException
 import com.example.alim.track.TrackService
 import org.springframework.stereotype.Service
@@ -11,6 +13,7 @@ import java.util.UUID
 class LessonService(
 	private val lessonRepository: LessonRepository,
 	private val trackService: TrackService,
+	private val stickerRepository: StickerRepository,
 ) {
 	fun list(): List<Lesson> = lessonRepository.findAll()
 
@@ -62,6 +65,11 @@ class LessonService(
 	}
 
 	fun delete(id: String) {
+		if (stickerRepository.findAll().any {
+				it.rule.scopeType == AchievementScopeType.LESSON && it.rule.scopeId == id
+			}) {
+			throw InvalidLessonDataException("lesson is referenced by an achievement rule")
+		}
 		if (!lessonRepository.deleteById(id)) {
 			throw LessonNotFoundException()
 		}

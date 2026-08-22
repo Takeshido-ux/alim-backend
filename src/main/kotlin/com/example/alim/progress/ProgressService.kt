@@ -4,6 +4,8 @@ import com.example.alim.child.ChildService
 import com.example.alim.lesson.Lesson
 import com.example.alim.lesson.LessonService
 import com.example.alim.parent.CurrentParentResolver
+import com.example.alim.sticker.AchievementMetric
+import com.example.alim.sticker.AchievementScopeType
 import com.example.alim.sticker.Sticker
 import com.example.alim.sticker.StickerService
 import com.example.alim.track.Track
@@ -60,9 +62,9 @@ class ProgressService(
 				dailyGoal = parent.preferences.dailyLessonGoal,
 			),
 			reviewAvailable = reviewAvailable,
-			recentSticker = wallet.lastGrantedStickerId?.let { stickerId ->
-				stickerService.list().find { it.id == stickerId }?.let {
-					RecentSticker(stickerId = it.id, slug = it.slug, title = it.title)
+			recentAchievement = wallet.lastGrantedAchievementId?.let { achievementId ->
+				stickerService.list().find { it.id == achievementId }?.let {
+					RecentAchievement(achievementId = it.id, slug = it.slug, title = it.title)
 				}
 			},
 		)
@@ -128,10 +130,11 @@ class ProgressService(
 		val existing = progressRepository.find(childId, lessonId)
 		if (existing?.status == LessonProgressStatus.completed) {
 			val wallet = progressRepository.findWallet(childId) ?: RewardWallet(childId = childId)
+			val reconciliation = reconcileAchievements(childId, wallet)
 			return CompleteLessonResult(
 				progress = existing,
-				newlyGrantedStickers = emptyList(),
-				wallet = wallet,
+				newlyGrantedAchievements = reconciliation.granted,
+				wallet = reconciliation.wallet,
 			)
 		}
 
@@ -168,69 +171,40 @@ class ProgressService(
 		progressRepository.save(progress)
 
 		val wallet = progressRepository.findWallet(childId) ?: RewardWallet(childId = childId)
-		val granted = mutableListOf<GrantedSticker>()
-		val stickerIds = wallet.stickerIds.toMutableSet()
-		var lastGranted: String? = wallet.lastGrantedStickerId
-
-		fun grantSticker(stickerIdOrSlug: String) {
-			val sticker = runCatching { stickerService.getById(stickerIdOrSlug) }.getOrNull()
-				?: stickerService.findBySlug(stickerIdOrSlug)
-				?: return
-			if (stickerIds.add(sticker.id)) {
-				lastGranted = sticker.id
-				granted += GrantedSticker(id = sticker.id, slug = sticker.slug, title = sticker.title)
-			}
-		}
-
-		val anyCompletedBefore = progressRepository.findByChildId(childId)
-			.any { it.lessonId != lessonId && it.status == LessonProgressStatus.completed }
-		if (!anyCompletedBefore) {
-			grantSticker(FIRST_STEP_STICKER_SLUG)
-		}
-
-		val track = trackService.list().find { it.id == lesson.trackId || it.slug == lesson.trackId }
-		track?.stickerMilestones?.get(lesson.orderInTrack)?.let { grantSticker(it) }
-
-		val updatedWallet = wallet.copy(
+		val walletWithStars = wallet.copy(
 			totalStars = wallet.totalStars + stars,
-			stickerIds = stickerIds,
-			lastGrantedStickerId = lastGranted,
 		)
-		progressRepository.saveWallet(updatedWallet)
+		progressRepository.saveWallet(walletWithStars)
+		val reconciliation = reconcileAchievements(childId, walletWithStars)
 
 		return CompleteLessonResult(
 			progress = progress,
-			newlyGrantedStickers = granted,
-			wallet = updatedWallet,
+			newlyGrantedAchievements = reconciliation.granted,
+			wallet = reconciliation.wallet,
 		)
 	}
 
 	fun getRewards(childId: String): RewardsResult {
 		childService.requireOwnedChildForCurrentParent(childId)
-		val wallet = progressRepository.findWallet(childId) ?: RewardWallet(childId = childId)
-		val completedLessonIds = progressRepository.findByChildId(childId)
-			.filter { it.status == LessonProgressStatus.completed }
-			.mapTo(mutableSetOf()) { it.lessonId }
-		val tracks = trackService.list()
-		val lessons = lessonService.list()
-		val achievements = stickerService.list().map { sticker ->
+		val storedWallet = progressRepository.findWallet(childId) ?: RewardWallet(childId = childId)
+		val reconciliation = reconcileAchievements(childId, storedWallet)
+		val context = achievementContext(childId, reconciliation.wallet.totalStars)
+		val achievements = stickerService.list().filter(Sticker::active).map { sticker ->
+			val unlocked = sticker.id in reconciliation.wallet.achievementIds
+			val calculatedProgress = achievementProgress(sticker, context)
 			AchievementItem(
 				id = sticker.id,
 				slug = sticker.slug,
 				icon = sticker.icon,
 				title = sticker.title,
 				description = sticker.description,
-				progress = achievementProgress(
-					sticker = sticker,
-					wallet = wallet,
-					completedLessonIds = completedLessonIds,
-					tracks = tracks,
-					lessons = lessons,
-				),
+				unlocked = unlocked,
+				unlockedAt = reconciliation.wallet.achievementUnlockedAt[sticker.id]?.toString(),
+				progress = if (unlocked) calculatedProgress.copy(current = calculatedProgress.target) else calculatedProgress,
 			)
 		}
 		return RewardsResult(
-			totalStars = wallet.totalStars,
+			totalStars = reconciliation.wallet.totalStars,
 			achievements = achievements,
 		)
 	}
@@ -412,50 +386,65 @@ class ProgressService(
 
 	private fun achievementProgress(
 		sticker: Sticker,
-		wallet: RewardWallet,
-		completedLessonIds: Set<String>,
-		tracks: List<Track>,
-		lessons: List<Lesson>,
+		context: AchievementContext,
 	): AchievementProgress {
-		if (sticker.slug == FIRST_STEP_STICKER_SLUG) {
-			return AchievementProgress(
-				current = completedLessonIds.size.coerceAtMost(1),
-				target = 1,
-			)
-		}
-
-		val milestone = tracks
-			.sortedBy(Track::order)
-			.firstNotNullOfOrNull { track ->
-				track.stickerMilestones.entries
-					.filter { (_, stickerReference) ->
-						stickerReference == sticker.id || stickerReference == sticker.slug
-					}
-					.minByOrNull { it.key }
-					?.let { entry -> track to entry.key.coerceAtLeast(1) }
+		val rule = sticker.rule
+		val current = when (rule.metric) {
+			AchievementMetric.LESSONS_COMPLETED -> when (rule.scopeType) {
+				AchievementScopeType.GLOBAL -> context.lessons.count { it.id in context.completedLessonIds }
+				AchievementScopeType.TRACK -> context.track(rule.scopeId)?.let { track ->
+					context.lessonsFor(track).count { it.id in context.completedLessonIds }
+				} ?: 0
+				AchievementScopeType.LESSON -> 0
 			}
-		if (milestone != null) {
-			val (track, target) = milestone
-			val current = lessons.count { lesson ->
-				(lesson.trackId == track.id || lesson.trackId == track.slug) &&
-					lesson.orderInTrack <= target &&
-					lesson.id in completedLessonIds
+			AchievementMetric.TOTAL_STARS -> context.totalStars
+			AchievementMetric.TRACKS_COMPLETED -> when (rule.scopeType) {
+				AchievementScopeType.GLOBAL -> context.tracks.count(context::isTrackCompleted)
+				AchievementScopeType.TRACK -> if (
+					context.track(rule.scopeId)?.let(context::isTrackCompleted) == true
+				) 1 else 0
+				AchievementScopeType.LESSON -> 0
 			}
-			return AchievementProgress(
-				current = current.coerceAtMost(target),
-				target = target,
-			)
+			AchievementMetric.SPECIFIC_LESSON_COMPLETED ->
+				if (rule.scopeId != null && rule.scopeId in context.completedLessonIds) 1 else 0
 		}
+		return AchievementProgress(current = current.coerceAtMost(rule.target), target = rule.target)
+	}
 
-		return AchievementProgress(
-			current = if (sticker.id in wallet.stickerIds) 1 else 0,
-			target = 1,
+	private fun achievementContext(childId: String, totalStars: Int): AchievementContext =
+		AchievementContext(
+			totalStars = totalStars,
+			completedLessonIds = progressRepository.findByChildId(childId)
+				.filter { it.status == LessonProgressStatus.completed }
+				.mapTo(mutableSetOf()) { it.lessonId },
+			tracks = trackService.list(),
+			lessons = lessonService.list(),
 		)
+
+	private fun reconcileAchievements(childId: String, wallet: RewardWallet): AchievementReconciliation {
+		val context = achievementContext(childId, wallet.totalStars)
+		val achievementIds = wallet.achievementIds.toMutableSet()
+		val unlockedAt = wallet.achievementUnlockedAt.toMutableMap()
+		val granted = stickerService.list()
+			.filter(Sticker::active)
+			.filter { sticker -> achievementProgress(sticker, context).let { it.current >= it.target } }
+			.filter { sticker -> achievementIds.add(sticker.id) }
+			.map { sticker ->
+				unlockedAt[sticker.id] = Instant.now()
+				GrantedAchievement(id = sticker.id, slug = sticker.slug, title = sticker.title)
+			}
+		if (granted.isEmpty()) return AchievementReconciliation(wallet = wallet, granted = emptyList())
+		val updatedWallet = wallet.copy(
+			achievementIds = achievementIds,
+			achievementUnlockedAt = unlockedAt,
+			lastGrantedAchievementId = granted.last().id,
+		)
+		progressRepository.saveWallet(updatedWallet)
+		return AchievementReconciliation(wallet = updatedWallet, granted = granted)
 	}
 
 	private companion object {
 		val REVIEW_TRACKS = setOf("adab", "dua")
-		const val FIRST_STEP_STICKER_SLUG = "first_step"
 		const val STRUGGLE_ATTEMPT_THRESHOLD = 3
 		const val STRUGGLE_RETRY_THRESHOLD = 3
 	}
@@ -510,7 +499,7 @@ data class PathTrack(
 
 data class SoftProgress(val completedToday: Int, val dailyGoal: Int)
 
-data class RecentSticker(val stickerId: String, val slug: String, val title: String)
+data class RecentAchievement(val achievementId: String, val slug: String, val title: String)
 
 data class PathResult(
 	val activeChild: PathChild,
@@ -518,14 +507,14 @@ data class PathResult(
 	val tracks: List<PathTrack>,
 	val softProgress: SoftProgress,
 	val reviewAvailable: Boolean,
-	val recentSticker: RecentSticker?,
+	val recentAchievement: RecentAchievement?,
 )
 
-data class GrantedSticker(val id: String, val slug: String, val title: String)
+data class GrantedAchievement(val id: String, val slug: String, val title: String)
 
 data class CompleteLessonResult(
 	val progress: LessonProgress,
-	val newlyGrantedStickers: List<GrantedSticker>,
+	val newlyGrantedAchievements: List<GrantedAchievement>,
 	val wallet: RewardWallet,
 )
 
@@ -540,6 +529,8 @@ data class AchievementItem(
 	val icon: String,
 	val title: String,
 	val description: String,
+	val unlocked: Boolean,
+	val unlockedAt: String?,
 	val progress: AchievementProgress,
 )
 
@@ -547,6 +538,29 @@ data class RewardsResult(
 	val totalStars: Int,
 	val achievements: List<AchievementItem>,
 )
+
+private data class AchievementReconciliation(
+	val wallet: RewardWallet,
+	val granted: List<GrantedAchievement>,
+)
+
+private data class AchievementContext(
+	val totalStars: Int,
+	val completedLessonIds: Set<String>,
+	val tracks: List<Track>,
+	val lessons: List<Lesson>,
+) {
+	fun track(idOrSlug: String?): Track? =
+		tracks.find { it.id == idOrSlug || it.slug == idOrSlug }
+
+	fun lessonsFor(track: Track): List<Lesson> =
+		lessons.filter { it.trackId == track.id || it.trackId == track.slug }
+
+	fun isTrackCompleted(track: Track): Boolean {
+		val trackLessons = lessonsFor(track)
+		return trackLessons.isNotEmpty() && trackLessons.all { it.id in completedLessonIds }
+	}
+}
 
 data class ReviewStep(
 	val lessonId: String,

@@ -26,7 +26,6 @@ data class TrackWriteRequest(
 	val iconColor: String,
 	@field:NotBlank(message = "backgroundImg is required")
 	val backgroundImg: String,
-	val stickerMilestones: Map<Int, String> = emptyMap(),
 )
 
 data class TrackResponse(
@@ -37,7 +36,6 @@ data class TrackResponse(
 	val description: String,
 	val iconColor: String,
 	val backgroundImg: String,
-	val stickerMilestones: Map<Int, String>,
 	val createdAt: String,
 	val updatedAt: String,
 )
@@ -54,7 +52,6 @@ data class CatalogTrackResponse(
 	val description: String,
 	val iconColor: String,
 	val backgroundImg: String,
-	val stickerMilestones: Map<Int, String>,
 )
 
 data class CatalogTrackListResponse(
@@ -114,7 +111,6 @@ private fun TrackWriteRequest.toInput() =
 		description = description,
 		iconColor = iconColor,
 		backgroundImg = backgroundImg,
-		stickerMilestones = stickerMilestones,
 	)
 
 private fun Track.toResponse() =
@@ -126,7 +122,6 @@ private fun Track.toResponse() =
 		description = description,
 		iconColor = iconColor,
 		backgroundImg = backgroundImg,
-		stickerMilestones = stickerMilestones,
 		createdAt = createdAt.toString(),
 		updatedAt = updatedAt.toString(),
 	)
@@ -140,5 +135,4 @@ private fun Track.toCatalogResponse() =
 		description = description,
 		iconColor = iconColor,
 		backgroundImg = backgroundImg,
-		stickerMilestones = stickerMilestones,
 	)

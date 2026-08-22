@@ -2,6 +2,7 @@ package com.example.alim.sticker
 
 import jakarta.validation.Valid
 import jakarta.validation.constraints.NotBlank
+import jakarta.validation.constraints.Min
 import org.springframework.http.HttpStatus
 import org.springframework.http.ResponseEntity
 import org.springframework.web.bind.annotation.DeleteMapping
@@ -21,6 +22,19 @@ data class StickerWriteRequest(
 	val description: String,
 	@field:NotBlank(message = "icon is required")
 	val icon: String,
+	@field:Valid
+	val rule: AchievementRuleRequest,
+	val active: Boolean,
+	@field:Min(value = 0, message = "order must be >= 0")
+	val order: Int,
+)
+
+data class AchievementRuleRequest(
+	val metric: AchievementMetric,
+	@field:Min(value = 1, message = "target must be >= 1")
+	val target: Int,
+	val scopeType: AchievementScopeType,
+	val scopeId: String? = null,
 )
 
 data class StickerResponse(
@@ -29,6 +43,9 @@ data class StickerResponse(
 	val title: String,
 	val description: String,
 	val icon: String,
+	val rule: AchievementRule,
+	val active: Boolean,
+	val order: Int,
 	val createdAt: String,
 	val updatedAt: String,
 )
@@ -43,6 +60,9 @@ data class CatalogStickerResponse(
 	val title: String,
 	val description: String,
 	val icon: String,
+	val rule: AchievementRule,
+	val active: Boolean,
+	val order: Int,
 )
 
 data class CatalogStickerListResponse(
@@ -50,7 +70,7 @@ data class CatalogStickerListResponse(
 )
 
 @RestController
-@RequestMapping("/api/admin/stickers")
+@RequestMapping("/api/admin/achievements")
 class AdminStickerController(
 	private val stickerService: StickerService,
 ) {
@@ -83,7 +103,7 @@ class AdminStickerController(
 }
 
 @RestController
-@RequestMapping("/api/catalog/stickers")
+@RequestMapping("/api/catalog/achievements")
 class CatalogStickerController(
 	private val stickerService: StickerService,
 ) {
@@ -103,6 +123,9 @@ private fun Sticker.toResponse() =
 		title = title,
 		description = description,
 		icon = icon,
+		rule = rule,
+		active = active,
+		order = order,
 		createdAt = createdAt.toString(),
 		updatedAt = updatedAt.toString(),
 	)
@@ -114,6 +137,9 @@ private fun Sticker.toCatalogResponse() =
 		title = title,
 		description = description,
 		icon = icon,
+		rule = rule,
+		active = active,
+		order = order,
 	)
 
 private fun StickerWriteRequest.toInput() =
@@ -121,4 +147,12 @@ private fun StickerWriteRequest.toInput() =
 		title = title,
 		description = description,
 		icon = icon,
+		rule = AchievementRule(
+			metric = rule.metric,
+			target = rule.target,
+			scopeType = rule.scopeType,
+			scopeId = rule.scopeId,
+		),
+		active = active,
+		order = order,
 	)

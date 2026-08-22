@@ -52,11 +52,11 @@ data class ProgressMapResponse(
 
 data class CompleteLessonResponse(
 	val progress: LessonProgressResponse,
-	val newlyGrantedStickers: List<GrantedStickerResponse>,
+	val newlyGrantedAchievements: List<GrantedAchievementResponse>,
 	val totalStars: Int,
 )
 
-data class GrantedStickerResponse(
+data class GrantedAchievementResponse(
 	val id: String,
 	val slug: String,
 	val title: String,
@@ -113,8 +113,8 @@ class ProgressController(
 		)
 		return CompleteLessonResponse(
 			progress = result.progress.toResponse(),
-			newlyGrantedStickers = result.newlyGrantedStickers.map {
-				GrantedStickerResponse(it.id, it.slug, it.title)
+			newlyGrantedAchievements = result.newlyGrantedAchievements.map {
+				GrantedAchievementResponse(it.id, it.slug, it.title)
 			},
 			totalStars = result.wallet.totalStars,
 		)

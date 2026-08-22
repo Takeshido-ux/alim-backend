@@ -64,11 +64,11 @@ data class AdminUserChildResponse(
 	val archivedAt: String?,
 	val isActive: Boolean,
 	val totalStars: Int,
-	val earnedStickers: List<AdminUserStickerResponse>,
+	val earnedAchievements: List<AdminUserAchievementResponse>,
 	val progress: List<AdminUserLessonProgressResponse>,
 )
 
-data class AdminUserStickerResponse(
+data class AdminUserAchievementResponse(
 	val id: String,
 	val slug: String,
 	val title: String,
@@ -206,9 +206,9 @@ class AdminUserService(
 			archivedAt = archivedAt?.asApiValue(),
 			isActive = id == activeChildId,
 			totalStars = wallet?.totalStars ?: 0,
-			earnedStickers = wallet?.stickerIds.orEmpty().mapNotNull { stickerId ->
+			earnedAchievements = wallet?.achievementIds.orEmpty().mapNotNull { stickerId ->
 				stickers[stickerId]?.let { sticker ->
-					AdminUserStickerResponse(
+					AdminUserAchievementResponse(
 						id = sticker.id,
 						slug = sticker.slug,
 						title = sticker.title,

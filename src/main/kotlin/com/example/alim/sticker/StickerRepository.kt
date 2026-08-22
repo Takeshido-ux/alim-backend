@@ -25,7 +25,7 @@ class InMemoryStickerRepository : StickerRepository {
 	private val stickerIdsBySlug = ConcurrentHashMap<String, String>()
 
 	override fun findAll(): List<Sticker> =
-		stickersById.values.sortedBy { it.slug }
+		stickersById.values.sortedWith(compareBy(Sticker::order, Sticker::slug))
 
 	override fun findById(id: String): Sticker? = stickersById[id]
 

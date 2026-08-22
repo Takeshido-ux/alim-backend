@@ -101,7 +101,7 @@ class JdbcProgressRepository(
 	override fun findWallet(childId: String): RewardWallet? {
 		val wallet = jdbc.query(
 			"""
-			SELECT child_id, total_stars, last_granted_sticker_id
+			SELECT child_id, total_stars, last_granted_achievement_id
 			FROM reward_wallets
 			WHERE child_id = ?
 			""".trimIndent(),
@@ -109,27 +109,28 @@ class JdbcProgressRepository(
 				Triple(
 					rs.getString("child_id"),
 					rs.getInt("total_stars"),
-					rs.getString("last_granted_sticker_id"),
+					rs.getString("last_granted_achievement_id"),
 				)
 			},
 			childId,
 		).firstOrNull() ?: return null
 
-		val stickerIds = jdbc.query(
+		val unlockedAchievements = jdbc.query(
 			"""
-			SELECT sticker_id
-			FROM reward_wallet_stickers
+			SELECT achievement_id, unlocked_at
+			FROM child_achievements
 			WHERE child_id = ?
 			""".trimIndent(),
-			{ rs, _ -> rs.getString("sticker_id") },
+			{ rs, _ -> rs.getString("achievement_id") to rs.getTimestamp("unlocked_at").toInstant() },
 			childId,
-		).toSet()
+		).toMap()
 
 		return RewardWallet(
 			childId = wallet.first,
 			totalStars = wallet.second,
-			stickerIds = stickerIds,
-			lastGrantedStickerId = wallet.third,
+			achievementIds = unlockedAchievements.keys,
+			achievementUnlockedAt = unlockedAchievements,
+			lastGrantedAchievementId = wallet.third,
 		)
 	}
 
@@ -137,26 +138,27 @@ class JdbcProgressRepository(
 	override fun saveWallet(wallet: RewardWallet): RewardWallet {
 		jdbc.update(
 			"""
-			INSERT INTO reward_wallets (child_id, total_stars, last_granted_sticker_id)
+			INSERT INTO reward_wallets (child_id, total_stars, last_granted_achievement_id)
 			VALUES (?, ?, ?)
 			ON CONFLICT (child_id) DO UPDATE SET
 				total_stars = EXCLUDED.total_stars,
-				last_granted_sticker_id = EXCLUDED.last_granted_sticker_id
+				last_granted_achievement_id = EXCLUDED.last_granted_achievement_id
 			""".trimIndent(),
 			wallet.childId,
 			wallet.totalStars,
-			wallet.lastGrantedStickerId,
+			wallet.lastGrantedAchievementId,
 		)
-		jdbc.update("DELETE FROM reward_wallet_stickers WHERE child_id = ?", wallet.childId)
-		wallet.stickerIds.forEach { stickerId ->
+		jdbc.update("DELETE FROM child_achievements WHERE child_id = ?", wallet.childId)
+		wallet.achievementIds.forEach { achievementId ->
 			jdbc.update(
 				"""
-				INSERT INTO reward_wallet_stickers (child_id, sticker_id)
-				VALUES (?, ?)
+				INSERT INTO child_achievements (child_id, achievement_id, unlocked_at)
+				VALUES (?, ?, ?)
 				ON CONFLICT DO NOTHING
 				""".trimIndent(),
 				wallet.childId,
-				stickerId,
+				achievementId,
+				(wallet.achievementUnlockedAt[achievementId] ?: java.time.Instant.now()).toTimestamp(),
 			)
 		}
 		return wallet

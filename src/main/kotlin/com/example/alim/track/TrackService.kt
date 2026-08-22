@@ -1,6 +1,9 @@
 package com.example.alim.track
 
 import com.example.alim.common.SlugGenerator
+import com.example.alim.lesson.LessonRepository
+import com.example.alim.sticker.AchievementScopeType
+import com.example.alim.sticker.StickerRepository
 import org.springframework.stereotype.Service
 import java.time.Instant
 import java.util.UUID
@@ -8,6 +11,8 @@ import java.util.UUID
 @Service
 class TrackService(
 	private val trackRepository: TrackRepository,
+	private val lessonRepository: LessonRepository,
+	private val stickerRepository: StickerRepository,
 ) {
 	fun list(): List<Track> = trackRepository.findAll()
 
@@ -33,7 +38,6 @@ class TrackService(
 				description = input.description.trim(),
 				iconColor = input.iconColor.trim(),
 				backgroundImg = input.backgroundImg.trim(),
-				stickerMilestones = input.stickerMilestones,
 				createdAt = now,
 				updatedAt = now,
 			),
@@ -50,13 +54,26 @@ class TrackService(
 				description = input.description.trim(),
 				iconColor = input.iconColor.trim(),
 				backgroundImg = input.backgroundImg.trim(),
-				stickerMilestones = input.stickerMilestones,
 				updatedAt = Instant.now(),
 			),
 		)
 	}
 
 	fun delete(id: String) {
+		val lessonIds = lessonRepository.findAll()
+			.filter { it.trackId == id }
+			.mapTo(mutableSetOf()) { it.id }
+		val referenced = stickerRepository.findAll().any {
+			(it.rule.scopeType == AchievementScopeType.TRACK && it.rule.scopeId == id) ||
+				(
+					it.rule.scopeType == AchievementScopeType.LESSON &&
+					it.rule.scopeId != null &&
+					it.rule.scopeId in lessonIds
+				)
+		}
+		if (referenced) {
+			throw InvalidTrackDataException("track is referenced by an achievement rule")
+		}
 		if (!trackRepository.deleteById(id)) {
 			throw TrackNotFoundException()
 		}
@@ -78,14 +95,6 @@ class TrackService(
 		if (input.backgroundImg.isBlank()) {
 			throw InvalidTrackDataException("backgroundImg is required")
 		}
-		input.stickerMilestones.forEach { (lessonOrder, stickerId) ->
-			if (lessonOrder < 1) {
-				throw InvalidTrackDataException("stickerMilestones keys must be >= 1")
-			}
-			if (stickerId.isBlank()) {
-				throw InvalidTrackDataException("stickerMilestones values must not be blank")
-			}
-		}
 	}
 }
 
@@ -95,7 +104,6 @@ data class TrackWriteInput(
 	val description: String,
 	val iconColor: String,
 	val backgroundImg: String,
-	val stickerMilestones: Map<Int, String> = emptyMap(),
 )
 
 private val HEX_COLOR = Regex("^#[0-9A-Fa-f]{6}$")

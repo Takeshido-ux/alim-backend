@@ -10,8 +10,6 @@ data class Track(
 	val description: String,
 	val iconColor: String,
 	val backgroundImg: String,
-	/** orderInTrack -> sticker slug granted when that lesson is completed */
-	val stickerMilestones: Map<Int, String> = emptyMap(),
 	val createdAt: Instant,
 	val updatedAt: Instant,
 )
