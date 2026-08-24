@@ -37,6 +37,7 @@ data class LessonWriteRequest(
 	val backgroundImg: String = "",
 	@field:NotBlank(message = "parentNote is required")
 	val parentNote: String,
+	val ageBand: String = "all",
 	val contentVersion: String = "1",
 	@field:NotEmpty(message = "steps are required")
 	@field:Size(min = 4, max = 7, message = "steps must contain 4 to 7 items")
@@ -60,6 +61,7 @@ data class LessonResponse(
 	val description: String,
 	val backgroundImg: String,
 	val parentNote: String,
+	val ageBand: String,
 	val contentVersion: String,
 	val steps: List<LessonStepResponse>,
 	val createdAt: String,
@@ -74,6 +76,7 @@ data class LessonSummaryResponse(
 	val title: String,
 	val description: String,
 	val backgroundImg: String,
+	val ageBand: String,
 	val contentVersion: String,
 )
 
@@ -144,6 +147,7 @@ private fun LessonWriteRequest.toInput() =
 		description = description,
 		backgroundImg = backgroundImg,
 		parentNote = parentNote,
+		ageBand = ageBand,
 		contentVersion = contentVersion,
 		steps = steps.map {
 			LessonStepInput(
@@ -165,6 +169,7 @@ private fun Lesson.toResponse() =
 		description = description,
 		backgroundImg = backgroundImg,
 		parentNote = parentNote,
+		ageBand = ageBand,
 		contentVersion = contentVersion,
 		steps = steps.map {
 			LessonStepResponse(
@@ -187,5 +192,6 @@ private fun Lesson.toSummaryResponse() =
 		title = title,
 		description = description,
 		backgroundImg = backgroundImg,
+		ageBand = ageBand,
 		contentVersion = contentVersion,
 	)

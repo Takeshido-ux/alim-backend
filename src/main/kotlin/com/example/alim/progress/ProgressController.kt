@@ -23,11 +23,21 @@ data class ProgressUpsertRequest(
 	val clientUpdatedAt: String? = null,
 )
 
+data class StepResultRequest(
+	val stepId: String,
+	val objectiveId: String,
+	val objectiveTitle: String,
+	val correct: Boolean,
+	@field:Min(value = 1, message = "attempts must be >= 1")
+	val attempts: Int = 1,
+)
+
 data class CompleteLessonRequest(
 	val completedStepIds: List<String> = emptyList(),
 	val attemptCount: Int? = null,
 	val firstTryPracticeCorrect: Boolean? = null,
 	val incorrectPracticeRetries: Int? = null,
+	val stepResults: List<StepResultRequest> = emptyList(),
 )
 
 data class LessonProgressResponse(
@@ -109,6 +119,9 @@ class ProgressController(
 				attemptCount = body.attemptCount,
 				firstTryPracticeCorrect = body.firstTryPracticeCorrect,
 				incorrectPracticeRetries = body.incorrectPracticeRetries,
+				stepResults = body.stepResults.map {
+					StepResult(it.stepId, it.objectiveId, it.objectiveTitle, it.correct, it.attempts)
+				},
 			),
 		)
 		return CompleteLessonResponse(
@@ -127,6 +140,17 @@ class ProgressController(
 	@GetMapping("/review")
 	fun review(@PathVariable childId: String): ReviewResult =
 		progressService.getReview(childId)
+
+	@PostMapping("/review/complete")
+	fun completeReview(
+		@PathVariable childId: String,
+		@RequestBody results: List<StepResultRequest>,
+	) {
+		progressService.completeReview(
+			childId,
+			results.map { StepResult(it.stepId, it.objectiveId, it.objectiveTitle, it.correct, it.attempts) },
+		)
+	}
 
 	@GetMapping("/parent-summary")
 	fun parentSummary(@PathVariable childId: String): ParentSummaryResult =

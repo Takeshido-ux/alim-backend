@@ -18,6 +18,7 @@ data class Lesson(
 	val description: String,
 	val backgroundImg: String,
 	val parentNote: String,
+	val ageBand: String = "all",
 	val contentVersion: String,
 	val steps: List<LessonStep>,
 	val createdAt: Instant,

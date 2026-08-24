@@ -23,6 +23,7 @@ class JdbcLessonRepository(
 			description = rs.getString("description"),
 			backgroundImg = rs.getString("background_img"),
 			parentNote = rs.getString("parent_note"),
+			ageBand = rs.getString("age_band"),
 			contentVersion = rs.getString("content_version"),
 			steps = json.lessonSteps(rs.getString("steps")),
 			createdAt = rs.getTimestamp("created_at").toInstant(),
@@ -33,7 +34,7 @@ class JdbcLessonRepository(
 	override fun findAll(): List<Lesson> =
 		jdbc.query(
 			"""
-			SELECT id, slug, track_id, order_in_track, title, description, background_img, parent_note, content_version,
+			SELECT id, slug, track_id, order_in_track, title, description, background_img, parent_note, age_band, content_version,
 			       steps::text, created_at, updated_at
 			FROM lessons
 			ORDER BY track_id, order_in_track, slug
@@ -44,7 +45,7 @@ class JdbcLessonRepository(
 	override fun findById(id: String): Lesson? =
 		jdbc.query(
 			"""
-			SELECT id, slug, track_id, order_in_track, title, description, background_img, parent_note, content_version,
+			SELECT id, slug, track_id, order_in_track, title, description, background_img, parent_note, age_band, content_version,
 			       steps::text, created_at, updated_at
 			FROM lessons
 			WHERE id = ?
@@ -56,7 +57,7 @@ class JdbcLessonRepository(
 	override fun findBySlug(slug: String): Lesson? =
 		jdbc.query(
 			"""
-			SELECT id, slug, track_id, order_in_track, title, description, background_img, parent_note, content_version,
+			SELECT id, slug, track_id, order_in_track, title, description, background_img, parent_note, age_band, content_version,
 			       steps::text, created_at, updated_at
 			FROM lessons
 			WHERE slug = ?
@@ -69,9 +70,9 @@ class JdbcLessonRepository(
 		jdbc.update(
 			"""
 			INSERT INTO lessons (
-				id, slug, track_id, order_in_track, title, description, background_img, parent_note,
+				id, slug, track_id, order_in_track, title, description, background_img, parent_note, age_band,
 				content_version, steps, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (id) DO UPDATE SET
 				slug = EXCLUDED.slug,
 				track_id = EXCLUDED.track_id,
@@ -80,6 +81,7 @@ class JdbcLessonRepository(
 				description = EXCLUDED.description,
 				background_img = EXCLUDED.background_img,
 				parent_note = EXCLUDED.parent_note,
+				age_band = EXCLUDED.age_band,
 				content_version = EXCLUDED.content_version,
 				steps = EXCLUDED.steps,
 				created_at = EXCLUDED.created_at,
@@ -93,6 +95,7 @@ class JdbcLessonRepository(
 			lesson.description,
 			lesson.backgroundImg,
 			lesson.parentNote,
+			lesson.ageBand,
 			lesson.contentVersion,
 			json.toJsonb(lesson.steps),
 			lesson.createdAt.toTimestamp(),

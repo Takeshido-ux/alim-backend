@@ -22,12 +22,13 @@ class ChildService(
 	fun createChild(name: String, age: Int, avatarId: String): ChildProfile {
 		val parent = currentParentResolver.requireParent()
 		validateChildFields(name, age, avatarId)
+		val normalizedAge = age.toAgeBandValue()
 
 		val child = ChildProfile(
 			id = UUID.randomUUID().toString(),
 			parentId = parent.id,
 			name = name.trim(),
-			age = age,
+			age = normalizedAge,
 			avatarId = avatarId,
 			createdAt = Instant.now(),
 		)
@@ -45,7 +46,7 @@ class ChildService(
 		val existing = requireOwnedChild(parent.id, childId)
 
 		val nextName = name?.trim() ?: existing.name
-		val nextAge = age ?: existing.age
+		val nextAge = (age ?: existing.age).toAgeBandValue()
 		val nextAvatarId = avatarId ?: existing.avatarId
 		validateChildFields(nextName, nextAge, nextAvatarId)
 
@@ -97,8 +98,8 @@ class ChildService(
 		if (trimmed.isEmpty() || trimmed.length > MAX_NAME_LENGTH) {
 			throw InvalidChildDataException("Name must be 1 to $MAX_NAME_LENGTH characters")
 		}
-		if (age !in ALLOWED_AGES) {
-			throw InvalidChildDataException("Age must be 5 or 6")
+		if (age !in MIN_AGE_VALUE..MAX_AGE_VALUE) {
+			throw InvalidChildDataException("Age band must be 4–5 or 6–8")
 		}
 		if (avatarId !in ALLOWED_AVATARS) {
 			throw InvalidChildDataException("Avatar must be one of: ${ALLOWED_AVATARS.joinToString()}")
@@ -107,10 +108,13 @@ class ChildService(
 
 	private companion object {
 		const val MAX_NAME_LENGTH = 24
-		val ALLOWED_AGES = setOf(5, 6)
+		const val MIN_AGE_VALUE = 4
+		const val MAX_AGE_VALUE = 8
 		val ALLOWED_AVATARS = setOf("sun", "moon", "star", "leaf")
 	}
 }
+
+private fun Int.toAgeBandValue(): Int = if (this <= 5) 5 else 7
 
 data class ChildrenListResult(
 	val items: List<ChildProfile>,

@@ -15,6 +15,12 @@ interface ProgressRepository {
 
 	fun saveWallet(wallet: RewardWallet): RewardWallet
 
+	fun findSkillsByChildId(childId: String): List<SkillProgress>
+
+	fun findSkill(childId: String, objectiveId: String): SkillProgress?
+
+	fun saveSkill(progress: SkillProgress): SkillProgress
+
 	fun deleteByChildId(childId: String)
 }
 
@@ -23,6 +29,7 @@ interface ProgressRepository {
 class InMemoryProgressRepository : ProgressRepository {
 	private val progress = ConcurrentHashMap<String, LessonProgress>()
 	private val wallets = ConcurrentHashMap<String, RewardWallet>()
+	private val skills = ConcurrentHashMap<String, SkillProgress>()
 
 	private fun key(childId: String, lessonId: String) = "$childId::$lessonId"
 
@@ -44,8 +51,20 @@ class InMemoryProgressRepository : ProgressRepository {
 		return wallet
 	}
 
+	override fun findSkillsByChildId(childId: String): List<SkillProgress> =
+		skills.values.filter { it.childId == childId }
+
+	override fun findSkill(childId: String, objectiveId: String): SkillProgress? =
+		skills["$childId::$objectiveId"]
+
+	override fun saveSkill(progress: SkillProgress): SkillProgress {
+		skills["${progress.childId}::${progress.objectiveId}"] = progress
+		return progress
+	}
+
 	override fun deleteByChildId(childId: String) {
 		progress.entries.removeIf { (_, item) -> item.childId == childId }
 		wallets.remove(childId)
+		skills.entries.removeIf { (_, item) -> item.childId == childId }
 	}
 }

@@ -32,6 +32,17 @@ class JdbcProgressRepository(
 			contentVersionAtStart = rs.getString("content_version_at_start"),
 		)
 	}
+	private val skillMapper = RowMapper { rs, _ ->
+		SkillProgress(
+			childId = rs.getString("child_id"),
+			objectiveId = rs.getString("objective_id"),
+			objectiveTitle = rs.getString("objective_title"),
+			state = SkillMasteryState.valueOf(rs.getString("state")),
+			successfulAttempts = rs.getInt("successful_attempts"),
+			totalAttempts = rs.getInt("total_attempts"),
+			lastPracticedAt = rs.getTimestamp("last_practiced_at").toInstant(),
+		)
+	}
 
 	override fun findByChildId(childId: String): List<LessonProgress> =
 		jdbc.query(
@@ -164,9 +175,61 @@ class JdbcProgressRepository(
 		return wallet
 	}
 
+	override fun findSkillsByChildId(childId: String): List<SkillProgress> =
+		jdbc.query(
+			"""
+			SELECT child_id, objective_id, objective_title, state, successful_attempts,
+			       total_attempts, last_practiced_at
+			FROM skill_progress
+			WHERE child_id = ?
+			ORDER BY last_practiced_at DESC, objective_title
+			""".trimIndent(),
+			skillMapper,
+			childId,
+		)
+
+	override fun findSkill(childId: String, objectiveId: String): SkillProgress? =
+		jdbc.query(
+			"""
+			SELECT child_id, objective_id, objective_title, state, successful_attempts,
+			       total_attempts, last_practiced_at
+			FROM skill_progress
+			WHERE child_id = ? AND objective_id = ?
+			""".trimIndent(),
+			skillMapper,
+			childId,
+			objectiveId,
+		).firstOrNull()
+
+	override fun saveSkill(progress: SkillProgress): SkillProgress {
+		jdbc.update(
+			"""
+			INSERT INTO skill_progress (
+				child_id, objective_id, objective_title, state, successful_attempts,
+				total_attempts, last_practiced_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?)
+			ON CONFLICT (child_id, objective_id) DO UPDATE SET
+				objective_title = EXCLUDED.objective_title,
+				state = EXCLUDED.state,
+				successful_attempts = EXCLUDED.successful_attempts,
+				total_attempts = EXCLUDED.total_attempts,
+				last_practiced_at = EXCLUDED.last_practiced_at
+			""".trimIndent(),
+			progress.childId,
+			progress.objectiveId,
+			progress.objectiveTitle,
+			progress.state.name,
+			progress.successfulAttempts,
+			progress.totalAttempts,
+			progress.lastPracticedAt.toTimestamp(),
+		)
+		return progress
+	}
+
 	@Transactional
 	override fun deleteByChildId(childId: String) {
 		jdbc.update("DELETE FROM lesson_progress WHERE child_id = ?", childId)
+		jdbc.update("DELETE FROM skill_progress WHERE child_id = ?", childId)
 		jdbc.update("DELETE FROM reward_wallets WHERE child_id = ?", childId)
 	}
 }

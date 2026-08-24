@@ -56,6 +56,7 @@ data class AdminCatalogLesson(
 	val description: String,
 	val backgroundImg: String = "",
 	val parentNote: String,
+	val ageBand: String = "all",
 	val contentVersion: String,
 	val steps: List<AdminCatalogLessonStep>,
 	val createdAt: String = "",
@@ -241,6 +242,9 @@ class AdminCatalogService(
 			if (lesson.orderInTrack < 1) invalid("lessons[$index].orderInTrack must be >= 1")
 			if (lesson.title.isBlank()) invalid("lessons[$index].title is required")
 			if (lesson.contentVersion.isBlank()) invalid("lessons[$index].contentVersion is required")
+			if (lesson.ageBand !in ALLOWED_AGE_BANDS) {
+				invalid("lessons[$index].ageBand must be one of: ${ALLOWED_AGE_BANDS.joinToString()}")
+			}
 			if (lesson.steps.size !in MIN_STEPS..MAX_STEPS) {
 				invalid("lessons[$index].steps must contain $MIN_STEPS to $MAX_STEPS items")
 			}
@@ -358,7 +362,8 @@ class AdminCatalogService(
 		const val MIN_STEPS = 4
 		const val MAX_STEPS = 7
 		val HEX_COLOR = Regex("^#[0-9A-Fa-f]{6}$")
-		val ALLOWED_STEP_TYPES = setOf("listen", "show", "repeat", "order", "video")
+		val ALLOWED_STEP_TYPES = setOf("listen", "show", "repeat", "order", "story", "video")
+		val ALLOWED_AGE_BANDS = setOf("all", "4-5", "6-8")
 	}
 }
 
@@ -384,6 +389,7 @@ private fun AdminCatalogSnapshot.normalized() = AdminCatalogSnapshot(
 			description = it.description.trim(),
 			backgroundImg = it.backgroundImg.trim(),
 			parentNote = it.parentNote.trim(),
+			ageBand = it.ageBand.trim().ifEmpty { "all" },
 			contentVersion = it.contentVersion.trim(),
 			steps = it.steps.withGeneratedIds().map { step ->
 				step.copy(
@@ -483,6 +489,7 @@ private fun AdminCatalogLesson.toEntity(existing: Lesson?, now: Instant): Lesson
 		description = description,
 		backgroundImg = backgroundImg,
 		parentNote = parentNote,
+		ageBand = ageBand,
 		contentVersion = contentVersion,
 		steps = steps.map {
 			LessonStep(stepId = it.stepId, type = it.type, payload = it.payload, assets = it.assets)
@@ -558,6 +565,7 @@ private fun Lesson.toSnapshot() =
 		description = description,
 		backgroundImg = backgroundImg,
 		parentNote = parentNote,
+		ageBand = ageBand,
 		contentVersion = contentVersion,
 		steps = steps.map { AdminCatalogLessonStep(it.stepId, it.type, it.payload, it.assets) },
 		createdAt = createdAt.toString(),

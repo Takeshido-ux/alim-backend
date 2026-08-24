@@ -22,8 +22,8 @@ data class CreateChildRequest(
 	@field:NotBlank(message = "Name is required")
 	@field:Size(max = 24, message = "Name must be at most 24 characters")
 	val name: String,
-	@field:Min(value = 5, message = "Age must be 5 or 6")
-	@field:Max(value = 6, message = "Age must be 5 or 6")
+	@field:Min(value = 4, message = "Age band must be 4–5 or 6–8")
+	@field:Max(value = 8, message = "Age band must be 4–5 or 6–8")
 	val age: Int,
 	@field:NotBlank(message = "Avatar is required")
 	val avatarId: String,
@@ -32,8 +32,8 @@ data class CreateChildRequest(
 data class UpdateChildRequest(
 	@field:Size(max = 24, message = "Name must be at most 24 characters")
 	val name: String? = null,
-	@field:Min(value = 5, message = "Age must be 5 or 6")
-	@field:Max(value = 6, message = "Age must be 5 or 6")
+	@field:Min(value = 4, message = "Age band must be 4–5 or 6–8")
+	@field:Max(value = 8, message = "Age band must be 4–5 or 6–8")
 	val age: Int? = null,
 	val avatarId: String? = null,
 )

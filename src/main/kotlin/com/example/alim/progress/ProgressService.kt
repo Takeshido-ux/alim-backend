@@ -28,7 +28,7 @@ class ProgressService(
 		val child = childService.requireOwnedChildForCurrentParent(childId)
 		val parent = currentParentResolver.requireParent()
 		val tracks = trackService.list()
-		val lessons = lessonService.list()
+		val lessons = lessonService.list().filter { it.matchesAge(child.age) }
 		val progressByLesson = progressRepository.findByChildId(childId).associateBy { it.lessonId }
 		val wallet = progressRepository.findWallet(childId) ?: RewardWallet(childId = childId)
 
@@ -38,16 +38,8 @@ class ProgressService(
 			progress.status == LessonProgressStatus.completed &&
 				progress.completedAt?.atZone(ZoneOffset.UTC)?.toLocalDate() == LocalDate.now(ZoneOffset.UTC)
 		}
-		val tracksById = tracks.associateBy { it.id }
-		val tracksBySlug = tracks.associateBy { it.slug }
-		val reviewAvailable = progressByLesson.values.any { progress ->
-			if (progress.status != LessonProgressStatus.completed) {
-				return@any false
-			}
-			val lesson = lessons.find { it.id == progress.lessonId } ?: return@any false
-			val track = tracksById[lesson.trackId] ?: tracksBySlug[lesson.trackId]
-			track?.slug in REVIEW_TRACKS
-		}
+		val reviewAvailable = progressRepository.findSkillsByChildId(childId).isNotEmpty() ||
+			progressByLesson.values.any { it.status == LessonProgressStatus.completed }
 
 		return PathResult(
 			activeChild = PathChild(
@@ -169,6 +161,7 @@ class ProgressService(
 			contentVersionAtStart = existing?.contentVersionAtStart ?: lesson.contentVersion,
 		)
 		progressRepository.save(progress)
+		applyStepResults(childId, input.stepResults)
 
 		val wallet = progressRepository.findWallet(childId) ?: RewardWallet(childId = childId)
 		val walletWithStars = wallet.copy(
@@ -210,24 +203,19 @@ class ProgressService(
 	}
 
 	fun getReview(childId: String): ReviewResult {
-		childService.requireOwnedChildForCurrentParent(childId)
+		val child = childService.requireOwnedChildForCurrentParent(childId)
 		val lessons = lessonService.list()
-		val tracks = trackService.list()
-		val tracksById = tracks.associateBy { it.id }
-		val tracksBySlug = tracks.associateBy { it.slug }
 		val completed = progressRepository.findByChildId(childId)
 			.filter { it.status == LessonProgressStatus.completed }
 			.mapNotNull { progress -> lessons.find { it.id == progress.lessonId } }
-			.filter { lesson ->
-				val track = tracksById[lesson.trackId] ?: tracksBySlug[lesson.trackId]
-				track?.slug in REVIEW_TRACKS
-			}
-			.take(4)
+			.filter { it.matchesAge(child.age) }
 
-		val steps = completed.flatMap { lesson ->
+		val priorities = progressRepository.findSkillsByChildId(childId)
+			.sortedWith(compareBy<SkillProgress>({ it.state.reviewPriority }, { it.lastPracticedAt }))
+			.map { it.objectiveId }
+		val candidates = completed.flatMap { lesson ->
 			lesson.steps
-				.filter { it.type in setOf("repeat", "show", "listen") }
-				.take(1)
+				.filter { it.type in setOf("repeat", "show", "listen", "order", "story") }
 				.map { step ->
 					ReviewStep(
 						lessonId = lesson.id,
@@ -238,13 +226,27 @@ class ProgressService(
 						assets = step.assets,
 					)
 				}
-		}.take(4)
+		}
+		val steps = candidates
+			.sortedBy { step ->
+				val objectiveId = (step.payload["objectiveId"] as? String)
+					?.takeIf { it.isNotBlank() }
+					?: "${step.lessonId}:${step.stepId}"
+				priorities.indexOf(objectiveId).takeIf { it >= 0 } ?: Int.MAX_VALUE
+			}
+			.distinctBy { it.stepId }
+			.take(4)
 
 		return ReviewResult(
 			available = steps.isNotEmpty(),
-			sourceLessonIds = completed.map { it.id },
+			sourceLessonIds = steps.map { it.lessonId }.distinct(),
 			steps = steps,
 		)
+	}
+
+	fun completeReview(childId: String, results: List<StepResult>) {
+		childService.requireOwnedChildForCurrentParent(childId)
+		applyStepResults(childId, results)
 	}
 
 	fun getParentSummary(childId: String): ParentSummaryResult {
@@ -282,19 +284,58 @@ class ProgressService(
 				)
 			},
 			struggleHints = struggle,
+			skills = progressRepository.findSkillsByChildId(childId).map {
+				SkillProgressSummary(
+					objectiveId = it.objectiveId,
+					title = it.objectiveTitle,
+					state = it.state.name,
+					successfulAttempts = it.successfulAttempts,
+					totalAttempts = it.totalAttempts,
+					lastPracticedAt = it.lastPracticedAt.toString(),
+				)
+			},
 		)
 	}
 
+	private fun applyStepResults(childId: String, results: List<StepResult>) {
+		val now = Instant.now()
+		results.filter { it.objectiveId.isNotBlank() }.forEach { result ->
+			val existing = progressRepository.findSkill(childId, result.objectiveId)
+			val total = (existing?.totalAttempts ?: 0) + result.attempts.coerceAtLeast(1)
+			val successful = (existing?.successfulAttempts ?: 0) + if (result.correct) 1 else 0
+			val accuracy = successful.toFloat() / total.coerceAtLeast(1)
+			val state = when {
+				existing?.state == SkillMasteryState.mastered && (!result.correct || result.attempts > 1) ->
+					SkillMasteryState.review_due
+				successful >= 2 && accuracy >= MASTERY_ACCURACY -> SkillMasteryState.mastered
+				total == 1 && !result.correct -> SkillMasteryState.introduced
+				else -> SkillMasteryState.practicing
+			}
+			progressRepository.saveSkill(
+				SkillProgress(
+					childId = childId,
+					objectiveId = result.objectiveId,
+					objectiveTitle = result.objectiveTitle.ifBlank { result.objectiveId },
+					state = state,
+					successfulAttempts = successful,
+					totalAttempts = total,
+					lastPracticedAt = now,
+				),
+			)
+		}
+	}
+
 	private fun ensureLessonUnlocked(childId: String, lesson: Lesson) {
+		val child = childService.requireOwnedChildForCurrentParent(childId)
 		val tracks = trackService.list()
-		val lessons = lessonService.list()
+		val lessons = lessonService.list().filter { it.matchesAge(child.age) }
 		val progressByLesson = progressRepository.findByChildId(childId).associateBy { it.lessonId }
 		val states = buildTrackStates(tracks, lessons, progressByLesson)
 		val status = states
 			.flatMap { it.lessons }
 			.find { it.lessonId == lesson.id }
 			?.status
-		if (status == "locked") {
+		if (status == null || status == "locked") {
 			throw LessonLockedException()
 		}
 	}
@@ -444,11 +485,22 @@ class ProgressService(
 	}
 
 	private companion object {
-		val REVIEW_TRACKS = setOf("adab", "dua")
 		const val STRUGGLE_ATTEMPT_THRESHOLD = 3
 		const val STRUGGLE_RETRY_THRESHOLD = 3
+		const val MASTERY_ACCURACY = 0.67f
 	}
 }
+
+private val SkillMasteryState.reviewPriority: Int
+	get() = when (this) {
+		SkillMasteryState.review_due -> 0
+		SkillMasteryState.practicing -> 1
+		SkillMasteryState.introduced -> 2
+		SkillMasteryState.mastered -> 3
+	}
+
+private fun Lesson.matchesAge(age: Int): Boolean =
+	ageBand == "all" || ageBand == if (age <= 5) "4-5" else "6-8"
 
 data class ProgressUpsertInput(
 	val currentStepIndex: Int,
@@ -464,6 +516,15 @@ data class CompleteLessonInput(
 	val attemptCount: Int? = null,
 	val firstTryPracticeCorrect: Boolean? = null,
 	val incorrectPracticeRetries: Int? = null,
+	val stepResults: List<StepResult> = emptyList(),
+)
+
+data class StepResult(
+	val stepId: String,
+	val objectiveId: String,
+	val objectiveTitle: String,
+	val correct: Boolean,
+	val attempts: Int,
 )
 
 data class PathChild(val id: String, val name: String, val avatarId: String)
@@ -595,6 +656,16 @@ data class StruggleHint(
 data class ParentSummaryResult(
 	val lastCompleted: LastCompletedSummary?,
 	val struggleHints: List<StruggleHint>,
+	val skills: List<SkillProgressSummary>,
+)
+
+data class SkillProgressSummary(
+	val objectiveId: String,
+	val title: String,
+	val state: String,
+	val successfulAttempts: Int,
+	val totalAttempts: Int,
+	val lastPracticedAt: String,
 )
 
 class LessonLockedException : RuntimeException()

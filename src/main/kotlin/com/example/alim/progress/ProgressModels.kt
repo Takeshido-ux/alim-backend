@@ -31,3 +31,20 @@ data class RewardWallet(
 	val achievementUnlockedAt: Map<String, Instant> = emptyMap(),
 	val lastGrantedAchievementId: String? = null,
 )
+
+enum class SkillMasteryState {
+	introduced,
+	practicing,
+	mastered,
+	review_due,
+}
+
+data class SkillProgress(
+	val childId: String,
+	val objectiveId: String,
+	val objectiveTitle: String,
+	val state: SkillMasteryState,
+	val successfulAttempts: Int,
+	val totalAttempts: Int,
+	val lastPracticedAt: Instant,
+)
