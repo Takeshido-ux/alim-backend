@@ -131,12 +131,12 @@ class CatalogLessonController(
 	@GetMapping
 	fun list(): LessonSummaryListResponse =
 		LessonSummaryListResponse(
-			items = lessonService.list().map { it.toSummaryResponse() },
+			items = lessonService.listResolved().map { it.toSummaryResponse() },
 		)
 
 	@GetMapping("/{id}")
 	fun get(@PathVariable id: String): LessonResponse =
-		lessonService.getById(id).toResponse()
+		lessonService.getResolvedById(id).toResponse()
 }
 
 private fun LessonWriteRequest.toInput() =

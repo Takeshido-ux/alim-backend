@@ -35,8 +35,8 @@ class JdbcProgressRepository(
 	private val skillMapper = RowMapper { rs, _ ->
 		SkillProgress(
 			childId = rs.getString("child_id"),
-			objectiveId = rs.getString("objective_id"),
-			objectiveTitle = rs.getString("objective_title"),
+			skillId = rs.getString("skill_id"),
+			skillTitle = rs.getString("skill_title"),
 			state = SkillMasteryState.valueOf(rs.getString("state")),
 			successfulAttempts = rs.getInt("successful_attempts"),
 			totalAttempts = rs.getInt("total_attempts"),
@@ -178,46 +178,46 @@ class JdbcProgressRepository(
 	override fun findSkillsByChildId(childId: String): List<SkillProgress> =
 		jdbc.query(
 			"""
-			SELECT child_id, objective_id, objective_title, state, successful_attempts,
+			SELECT child_id, skill_id, skill_title, state, successful_attempts,
 			       total_attempts, last_practiced_at
 			FROM skill_progress
 			WHERE child_id = ?
-			ORDER BY last_practiced_at DESC, objective_title
+			ORDER BY last_practiced_at DESC, skill_title
 			""".trimIndent(),
 			skillMapper,
 			childId,
 		)
 
-	override fun findSkill(childId: String, objectiveId: String): SkillProgress? =
+	override fun findSkill(childId: String, skillId: String): SkillProgress? =
 		jdbc.query(
 			"""
-			SELECT child_id, objective_id, objective_title, state, successful_attempts,
+			SELECT child_id, skill_id, skill_title, state, successful_attempts,
 			       total_attempts, last_practiced_at
 			FROM skill_progress
-			WHERE child_id = ? AND objective_id = ?
+			WHERE child_id = ? AND skill_id = ?
 			""".trimIndent(),
 			skillMapper,
 			childId,
-			objectiveId,
+			skillId,
 		).firstOrNull()
 
 	override fun saveSkill(progress: SkillProgress): SkillProgress {
 		jdbc.update(
 			"""
 			INSERT INTO skill_progress (
-				child_id, objective_id, objective_title, state, successful_attempts,
+				child_id, skill_id, skill_title, state, successful_attempts,
 				total_attempts, last_practiced_at
 			) VALUES (?, ?, ?, ?, ?, ?, ?)
-			ON CONFLICT (child_id, objective_id) DO UPDATE SET
-				objective_title = EXCLUDED.objective_title,
+			ON CONFLICT (child_id, skill_id) DO UPDATE SET
+				skill_title = EXCLUDED.skill_title,
 				state = EXCLUDED.state,
 				successful_attempts = EXCLUDED.successful_attempts,
 				total_attempts = EXCLUDED.total_attempts,
 				last_practiced_at = EXCLUDED.last_practiced_at
 			""".trimIndent(),
 			progress.childId,
-			progress.objectiveId,
-			progress.objectiveTitle,
+			progress.skillId,
+			progress.skillTitle,
 			progress.state.name,
 			progress.successfulAttempts,
 			progress.totalAttempts,

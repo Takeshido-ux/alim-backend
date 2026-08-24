@@ -17,7 +17,7 @@ interface ProgressRepository {
 
 	fun findSkillsByChildId(childId: String): List<SkillProgress>
 
-	fun findSkill(childId: String, objectiveId: String): SkillProgress?
+	fun findSkill(childId: String, skillId: String): SkillProgress?
 
 	fun saveSkill(progress: SkillProgress): SkillProgress
 
@@ -54,11 +54,11 @@ class InMemoryProgressRepository : ProgressRepository {
 	override fun findSkillsByChildId(childId: String): List<SkillProgress> =
 		skills.values.filter { it.childId == childId }
 
-	override fun findSkill(childId: String, objectiveId: String): SkillProgress? =
-		skills["$childId::$objectiveId"]
+	override fun findSkill(childId: String, skillId: String): SkillProgress? =
+		skills["$childId::$skillId"]
 
 	override fun saveSkill(progress: SkillProgress): SkillProgress {
-		skills["${progress.childId}::${progress.objectiveId}"] = progress
+		skills["${progress.childId}::${progress.skillId}"] = progress
 		return progress
 	}
 

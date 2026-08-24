@@ -1,10 +1,11 @@
 package com.example.alim.progress
 
-import com.example.alim.common.objectiveIdOr
 import com.example.alim.child.ChildService
 import com.example.alim.lesson.Lesson
 import com.example.alim.lesson.LessonService
 import com.example.alim.parent.CurrentParentResolver
+import com.example.alim.skill.SkillRepository
+import com.example.alim.skill.skillId
 import com.example.alim.sticker.AchievementMetric
 import com.example.alim.sticker.AchievementScopeType
 import com.example.alim.sticker.Sticker
@@ -24,6 +25,7 @@ class ProgressService(
 	private val trackService: TrackService,
 	private val stickerService: StickerService,
 	private val currentParentResolver: CurrentParentResolver,
+	private val skillRepository: SkillRepository,
 ) {
 	fun getPath(childId: String): PathResult {
 		val child = childService.requireOwnedChildForCurrentParent(childId)
@@ -205,7 +207,7 @@ class ProgressService(
 
 	fun getReview(childId: String): ReviewResult {
 		val child = childService.requireOwnedChildForCurrentParent(childId)
-		val lessons = lessonService.list()
+		val lessons = lessonService.listResolved()
 		val completed = progressRepository.findByChildId(childId)
 			.filter { it.status == LessonProgressStatus.completed }
 			.mapNotNull { progress -> lessons.find { it.id == progress.lessonId } }
@@ -213,7 +215,7 @@ class ProgressService(
 
 		val priorities = progressRepository.findSkillsByChildId(childId)
 			.sortedWith(compareBy<SkillProgress>({ it.state.reviewPriority }, { it.lastPracticedAt }))
-			.map { it.objectiveId }
+			.map { it.skillId }
 		val candidates = completed.flatMap { lesson ->
 			lesson.steps
 				.filter { it.type in setOf("repeat", "show", "listen", "order", "story") }
@@ -230,8 +232,8 @@ class ProgressService(
 		}
 		val steps = candidates
 			.sortedBy { step ->
-				val objectiveId = step.payload.objectiveIdOr("${step.lessonId}:${step.stepId}")
-				priorities.indexOf(objectiveId).takeIf { it >= 0 } ?: Int.MAX_VALUE
+				val skillId = step.payload.skillId()
+				priorities.indexOf(skillId).takeIf { it >= 0 } ?: Int.MAX_VALUE
 			}
 			.distinctBy { it.stepId }
 			.take(4)
@@ -285,8 +287,8 @@ class ProgressService(
 			struggleHints = struggle,
 			skills = progressRepository.findSkillsByChildId(childId).map {
 				SkillProgressSummary(
-					objectiveId = it.objectiveId,
-					title = it.objectiveTitle,
+					skillId = it.skillId,
+					title = it.skillTitle,
 					state = it.state.name,
 					successfulAttempts = it.successfulAttempts,
 					totalAttempts = it.totalAttempts,
@@ -298,8 +300,9 @@ class ProgressService(
 
 	private fun applyStepResults(childId: String, results: List<StepResult>) {
 		val now = Instant.now()
-		results.filter { it.objectiveId.isNotBlank() }.forEach { result ->
-			val existing = progressRepository.findSkill(childId, result.objectiveId)
+		results.filter { it.skillId.isNotBlank() }.forEach { result ->
+			val skill = skillRepository.findById(result.skillId) ?: return@forEach
+			val existing = progressRepository.findSkill(childId, result.skillId)
 			val total = (existing?.totalAttempts ?: 0) + result.attempts.coerceAtLeast(1)
 			val successful = (existing?.successfulAttempts ?: 0) + if (result.correct) 1 else 0
 			val accuracy = successful.toFloat() / total.coerceAtLeast(1)
@@ -313,8 +316,8 @@ class ProgressService(
 			progressRepository.saveSkill(
 				SkillProgress(
 					childId = childId,
-					objectiveId = result.objectiveId,
-					objectiveTitle = result.objectiveTitle.ifBlank { result.objectiveId },
+					skillId = skill.id,
+					skillTitle = skill.title,
 					state = state,
 					successfulAttempts = successful,
 					totalAttempts = total,
@@ -520,8 +523,7 @@ data class CompleteLessonInput(
 
 data class StepResult(
 	val stepId: String,
-	val objectiveId: String,
-	val objectiveTitle: String,
+	val skillId: String,
 	val correct: Boolean,
 	val attempts: Int,
 )
@@ -659,7 +661,7 @@ data class ParentSummaryResult(
 )
 
 data class SkillProgressSummary(
-	val objectiveId: String,
+	val skillId: String,
 	val title: String,
 	val state: String,
 	val successfulAttempts: Int,

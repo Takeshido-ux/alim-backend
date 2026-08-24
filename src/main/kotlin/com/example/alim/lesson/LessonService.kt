@@ -1,7 +1,10 @@
 package com.example.alim.lesson
 
 import com.example.alim.common.SlugGenerator
-import com.example.alim.common.withGeneratedObjectiveId
+import com.example.alim.skill.SkillRepository
+import com.example.alim.skill.skillId
+import com.example.alim.skill.withResolvedSkill
+import com.example.alim.skill.withoutLegacySkillFields
 import com.example.alim.sticker.AchievementScopeType
 import com.example.alim.sticker.StickerRepository
 import com.example.alim.track.TrackNotFoundException
@@ -15,11 +18,15 @@ class LessonService(
 	private val lessonRepository: LessonRepository,
 	private val trackService: TrackService,
 	private val stickerRepository: StickerRepository,
+	private val skillRepository: SkillRepository,
 ) {
 	fun list(): List<Lesson> = lessonRepository.findAll()
+	fun listResolved(): List<Lesson> = list().map(::resolveSkills)
 
 	fun getById(id: String): Lesson =
 		lessonRepository.findById(id) ?: throw LessonNotFoundException()
+
+	fun getResolvedById(id: String): Lesson = resolveSkills(getById(id))
 
 	fun create(input: LessonWriteInput): Lesson {
 		val normalized = input.normalized()
@@ -123,8 +130,19 @@ class LessonService(
 					"steps[$index].type must be one of: ${ALLOWED_STEP_TYPES.joinToString()}",
 				)
 			}
+			val skillId = step.payload.skillId()
+			if (skillId.isNotEmpty() && skillRepository.findById(skillId) == null) {
+				throw InvalidLessonDataException("steps[$index].skillId references missing skill: $skillId")
+			}
 		}
 	}
+
+	private fun resolveSkills(lesson: Lesson): Lesson = lesson.copy(
+		steps = lesson.steps.map { step ->
+			val skill = step.payload.skillId().takeIf(String::isNotEmpty)?.let(skillRepository::findById)
+			step.copy(payload = step.payload.withResolvedSkill(skill))
+		},
+	)
 
 	private fun LessonStepInput.toStep(): LessonStep =
 		LessonStep(
@@ -162,11 +180,12 @@ private fun LessonWriteInput.normalized(): LessonWriteInput {
 				} while (!usedStepIds.add(generated))
 				generated
 			}
+			val type = if (step.type.trim() == "choose_good") "show" else step.type.trim()
 			step.copy(
 				stepId = stepId,
-				type = if (step.type.trim() == "choose_good") "show" else step.type.trim(),
-				payload = step.payload.withGeneratedObjectiveId(),
-				assets = step.assets.map(String::trim).filter(String::isNotEmpty),
+				type = type,
+				payload = step.payload.withoutLegacySkillFields(),
+				assets = if (type == "video") step.assets.map(String::trim).filter(String::isNotEmpty) else emptyList(),
 			)
 		},
 	)

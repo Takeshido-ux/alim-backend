@@ -41,8 +41,8 @@ enum class SkillMasteryState {
 
 data class SkillProgress(
 	val childId: String,
-	val objectiveId: String,
-	val objectiveTitle: String,
+	val skillId: String,
+	val skillTitle: String,
 	val state: SkillMasteryState,
 	val successfulAttempts: Int,
 	val totalAttempts: Int,
