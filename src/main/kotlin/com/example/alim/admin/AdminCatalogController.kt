@@ -6,6 +6,7 @@ import com.example.alim.cartoon.CartoonFavoriteRepository
 import com.example.alim.cartoon.CartoonRepository
 import com.example.alim.cartoon.CartoonTag
 import com.example.alim.cartoon.CartoonTagRepository
+import com.example.alim.common.withGeneratedObjectiveId
 import com.example.alim.lesson.Lesson
 import com.example.alim.lesson.LessonRepository
 import com.example.alim.lesson.LessonStep
@@ -395,6 +396,7 @@ private fun AdminCatalogSnapshot.normalized() = AdminCatalogSnapshot(
 				step.copy(
 					stepId = step.stepId.trim(),
 					type = step.type.trim().replaceLegacyStepType(),
+					payload = step.payload.withGeneratedObjectiveId(),
 					assets = step.assets.map(String::trim).filter(String::isNotEmpty),
 				)
 			},

@@ -1,6 +1,7 @@
 package com.example.alim.lesson
 
 import com.example.alim.common.SlugGenerator
+import com.example.alim.common.withGeneratedObjectiveId
 import com.example.alim.sticker.AchievementScopeType
 import com.example.alim.sticker.StickerRepository
 import com.example.alim.track.TrackNotFoundException
@@ -164,6 +165,7 @@ private fun LessonWriteInput.normalized(): LessonWriteInput {
 			step.copy(
 				stepId = stepId,
 				type = if (step.type.trim() == "choose_good") "show" else step.type.trim(),
+				payload = step.payload.withGeneratedObjectiveId(),
 				assets = step.assets.map(String::trim).filter(String::isNotEmpty),
 			)
 		},

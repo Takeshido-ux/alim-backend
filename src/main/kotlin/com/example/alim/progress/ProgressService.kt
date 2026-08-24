@@ -1,5 +1,6 @@
 package com.example.alim.progress
 
+import com.example.alim.common.objectiveIdOr
 import com.example.alim.child.ChildService
 import com.example.alim.lesson.Lesson
 import com.example.alim.lesson.LessonService
@@ -229,9 +230,7 @@ class ProgressService(
 		}
 		val steps = candidates
 			.sortedBy { step ->
-				val objectiveId = (step.payload["objectiveId"] as? String)
-					?.takeIf { it.isNotBlank() }
-					?: "${step.lessonId}:${step.stepId}"
+				val objectiveId = step.payload.objectiveIdOr("${step.lessonId}:${step.stepId}")
 				priorities.indexOf(objectiveId).takeIf { it >= 0 } ?: Int.MAX_VALUE
 			}
 			.distinctBy { it.stepId }
