@@ -17,12 +17,14 @@ class MediaService(
 		if (file.isEmpty) {
 			throw InvalidMediaException("File is empty")
 		}
-		val contentType = file.contentType?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
-		if (!isAllowed(contentType)) {
-			throw InvalidMediaException("Only image and video files are allowed")
-		}
 		val originalFilename = file.originalFilename?.substringAfterLast('/')?.takeIf { it.isNotBlank() }
 			?: "file"
+		val declaredContentType = file.contentType?.takeIf { it.isNotBlank() } ?: "application/octet-stream"
+		val contentType = when {
+			isAllowed(declaredContentType) -> declaredContentType
+			else -> audioContentTypeFromFilename(originalFilename)
+				?: throw InvalidMediaException("Only image, audio and video files are allowed")
+		}
 		val id = UUID.randomUUID().toString()
 
 		val stored = file.inputStream.use { input ->
@@ -88,7 +90,21 @@ class MediaService(
 	}
 
 	private fun isAllowed(contentType: String): Boolean =
-		contentType.startsWith("image/") || contentType.startsWith("video/")
+		contentType.startsWith("image/") ||
+			contentType.startsWith("audio/") ||
+			contentType == "application/ogg"
+
+	private fun audioContentTypeFromFilename(filename: String): String? =
+		when (filename.substringAfterLast('.', "").lowercase()) {
+			"mp3" -> "audio/mpeg"
+			"m4a" -> "audio/mp4"
+			"aac" -> "audio/aac"
+			"wav" -> "audio/wav"
+			"ogg", "oga" -> "audio/ogg"
+			"opus" -> "audio/opus"
+			"flac" -> "audio/flac"
+			else -> null
+		}
 }
 
 class MediaNotFoundException : RuntimeException()
