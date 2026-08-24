@@ -8,6 +8,7 @@ interface SkillRepository {
 	fun findAll(): List<Skill>
 	fun findById(id: String): Skill?
 	fun save(skill: Skill): Skill
+	fun deleteById(id: String): Boolean
 	fun deleteByIds(ids: Collection<String>): Int
 }
 
@@ -25,6 +26,8 @@ class InMemorySkillRepository : SkillRepository {
 		return skill
 	}
 
+	override fun deleteById(id: String): Boolean = skills.remove(id) != null
+
 	override fun deleteByIds(ids: Collection<String>): Int =
-		ids.count { skills.remove(it) != null }
+		ids.count(::deleteById)
 }

@@ -14,7 +14,6 @@ import com.example.alim.sticker.AchievementRule
 import com.example.alim.sticker.AchievementScopeType
 import com.example.alim.sticker.Sticker
 import com.example.alim.sticker.StickerRepository
-import com.example.alim.skill.Skill
 import com.example.alim.skill.SkillRepository
 import com.example.alim.skill.skillId
 import com.example.alim.skill.withoutLegacySkillFields
@@ -35,18 +34,8 @@ data class AdminCatalogSnapshot(
 	val tracks: List<AdminCatalogTrack>,
 	val lessons: List<AdminCatalogLesson>,
 	val achievements: List<AdminCatalogSticker>,
-	val skills: List<AdminCatalogSkill> = emptyList(),
 	val cartoonTags: List<AdminCatalogCartoonTag> = emptyList(),
 	val cartoons: List<AdminCatalogCartoon> = emptyList(),
-)
-
-data class AdminCatalogSkill(
-	val id: String,
-	val title: String,
-	val audioUrl: String = "",
-	val illustrationUrl: String = "",
-	val createdAt: String = "",
-	val updatedAt: String = "",
 )
 
 data class AdminCatalogTrack(
@@ -163,7 +152,6 @@ class AdminCatalogService(
 		val existingTracks = trackRepository.findAll()
 		val existingLessons = lessonRepository.findAll()
 		val existingStickers = stickerRepository.findAll()
-		val existingSkills = skillRepository.findAll()
 		val existingTags = cartoonTagRepository.findAll()
 		val existingCartoons = cartoonRepository.findAll()
 		validateStableSlugs(normalized, existingTracks, existingLessons, existingStickers)
@@ -171,7 +159,6 @@ class AdminCatalogService(
 		val incomingTrackIds = normalized.tracks.mapTo(mutableSetOf()) { it.id }
 		val incomingLessonIds = normalized.lessons.mapTo(mutableSetOf()) { it.id }
 		val incomingStickerIds = normalized.achievements.mapTo(mutableSetOf()) { it.id }
-		val incomingSkillIds = normalized.skills.mapTo(mutableSetOf()) { it.id }
 		val incomingTagIds = normalized.cartoonTags.mapTo(mutableSetOf()) { it.id }
 		val incomingCartoonIds = normalized.cartoons.mapTo(mutableSetOf()) { it.id }
 
@@ -179,7 +166,6 @@ class AdminCatalogService(
 		lessonRepository.deleteByIds(existingLessons.map { it.id }.filterNot(incomingLessonIds::contains))
 		trackRepository.deleteByIds(existingTracks.map { it.id }.filterNot(incomingTrackIds::contains))
 		stickerRepository.deleteByIds(existingStickers.map { it.id }.filterNot(incomingStickerIds::contains))
-		skillRepository.deleteByIds(existingSkills.map { it.id }.filterNot(incomingSkillIds::contains))
 		existingCartoons.map { it.id }.filterNot(incomingCartoonIds::contains).forEach { cartoonId ->
 			cartoonFavoriteRepository.deleteByCartoonId(cartoonId)
 			cartoonRepository.deleteById(cartoonId)
@@ -190,7 +176,6 @@ class AdminCatalogService(
 		val tracksById = existingTracks.associateBy { it.id }
 		val lessonsById = existingLessons.associateBy { it.id }
 		val stickersById = existingStickers.associateBy { it.id }
-		val skillsById = existingSkills.associateBy { it.id }
 		val tagsById = existingTags.associateBy { it.id }
 		val cartoonsById = existingCartoons.associateBy { it.id }
 
@@ -202,10 +187,6 @@ class AdminCatalogService(
 		normalized.tracks.forEach { item ->
 			val existing = tracksById[item.id]
 			trackRepository.save(item.toEntity(existing, now))
-		}
-		normalized.skills.forEach { item ->
-			val existing = skillsById[item.id]
-			skillRepository.save(item.toEntity(existing, now))
 		}
 		normalized.lessons.forEach { item ->
 			val existing = lessonsById[item.id]
@@ -232,7 +213,6 @@ class AdminCatalogService(
 				.sortedWith(compareBy({ trackOrder[it.trackId] ?: Int.MAX_VALUE }, { it.orderInTrack }, { it.slug }))
 				.map(Lesson::toSnapshot),
 			achievements = stickerRepository.findAll().map(Sticker::toSnapshot),
-			skills = skillRepository.findAll().map(Skill::toSnapshot),
 			cartoonTags = cartoonTagRepository.findAll().map(CartoonTag::toSnapshot),
 			cartoons = cartoonRepository.findAll().map(Cartoon::toSnapshot),
 		)
@@ -246,11 +226,10 @@ class AdminCatalogService(
 		requireUnique(snapshot.lessons.map { it.slug }, "lesson slug")
 		requireUnique(snapshot.achievements.map { it.id }, "achievement id")
 		requireUnique(snapshot.achievements.map { it.slug }, "achievement slug")
-		requireUnique(snapshot.skills.map { it.id }, "skill id")
 
 		val tracksById = snapshot.tracks.associateBy { it.id }
 		val lessonIds = snapshot.lessons.mapTo(mutableSetOf()) { it.id }
-		val skillIds = snapshot.skills.mapTo(mutableSetOf()) { it.id }
+		val skillIds = skillRepository.findAll().mapTo(mutableSetOf()) { it.id }
 		requireUnique(snapshot.lessons.map { it.trackId to it.orderInTrack }, "lesson order within track")
 
 		snapshot.tracks.forEachIndexed { index, track ->
@@ -285,11 +264,6 @@ class AdminCatalogService(
 					invalid("lessons[$index].steps[$stepIndex].skillId references missing skill: $skillId")
 				}
 			}
-		}
-
-		snapshot.skills.forEachIndexed { index, skill ->
-			requireIdentifier(skill.id, "skills[$index].id", 36)
-			if (skill.title.isBlank()) invalid("skills[$index].title is required")
 		}
 
 		snapshot.achievements.forEachIndexed { index, sticker ->
@@ -447,14 +421,6 @@ private fun AdminCatalogSnapshot.normalized() = AdminCatalogSnapshot(
 			rule = it.rule.copy(scopeId = it.rule.scopeId?.trim()?.takeIf(String::isNotEmpty)),
 		)
 	},
-	skills = skills.map {
-		it.copy(
-			id = it.id.trim(),
-			title = it.title.trim(),
-			audioUrl = it.audioUrl.trim(),
-			illustrationUrl = it.illustrationUrl.trim(),
-		)
-	},
 	cartoonTags = cartoonTags.map {
 		it.copy(id = it.id.trim(), title = it.title.trim(), icon = it.icon.trim())
 	},
@@ -557,16 +523,6 @@ private fun AdminCatalogSticker.toEntity(existing: Sticker?, now: Instant): Stic
 		updatedAt = now,
 	)
 
-private fun AdminCatalogSkill.toEntity(existing: Skill?, now: Instant): Skill =
-	Skill(
-		id = id,
-		title = title,
-		audioUrl = audioUrl,
-		illustrationUrl = illustrationUrl,
-		createdAt = existing?.createdAt ?: now,
-		updatedAt = now,
-	)
-
 private fun AdminCatalogCartoonTag.toEntity(existing: CartoonTag?, now: Instant): CartoonTag =
 	CartoonTag(
 		id = id,
@@ -637,16 +593,6 @@ private fun Sticker.toSnapshot() =
 		rule = rule,
 		active = active,
 		order = order,
-		createdAt = createdAt.toString(),
-		updatedAt = updatedAt.toString(),
-	)
-
-private fun Skill.toSnapshot() =
-	AdminCatalogSkill(
-		id = id,
-		title = title,
-		audioUrl = audioUrl,
-		illustrationUrl = illustrationUrl,
 		createdAt = createdAt.toString(),
 		updatedAt = updatedAt.toString(),
 	)

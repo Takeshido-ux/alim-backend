@@ -18,6 +18,8 @@ import com.example.alim.media.MediaNotFoundException
 import com.example.alim.progress.InvalidProgressDataException
 import com.example.alim.progress.LessonLockedException
 import com.example.alim.sticker.InvalidStickerDataException
+import com.example.alim.skill.InvalidSkillDataException
+import com.example.alim.skill.SkillNotFoundException
 import com.example.alim.sticker.StickerNotFoundException
 import com.example.alim.sticker.StickerSlugAlreadyExistsException
 import com.example.alim.track.InvalidTrackDataException
@@ -136,6 +138,14 @@ class RestExceptionHandler {
 	@ExceptionHandler(InvalidStickerDataException::class)
 	fun handleInvalidStickerData(exception: InvalidStickerDataException): ResponseEntity<ApiError> =
 		error(HttpStatus.BAD_REQUEST, "invalid_sticker_data", exception.message)
+
+	@ExceptionHandler(SkillNotFoundException::class)
+	fun handleSkillNotFound(): ResponseEntity<ApiError> =
+		error(HttpStatus.NOT_FOUND, "skill_not_found", "Skill was not found")
+
+	@ExceptionHandler(InvalidSkillDataException::class)
+	fun handleInvalidSkillData(exception: InvalidSkillDataException): ResponseEntity<ApiError> =
+		error(HttpStatus.BAD_REQUEST, "invalid_skill_data", exception.message)
 
 	@ExceptionHandler(LessonLockedException::class)
 	fun handleLessonLocked(): ResponseEntity<ApiError> =
