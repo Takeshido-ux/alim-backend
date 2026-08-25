@@ -17,15 +17,17 @@ import org.springframework.web.bind.annotation.RestController
 data class SkillWriteRequest(
 	@field:NotBlank(message = "title is required")
 	val title: String,
-	val audioUrl: String = "",
-	val illustrationUrl: String = "",
+	val requiredSuccesses: Int = 2,
+	val minAccuracyPercent: Int = 67,
+	val requiredLessonCount: Int = 1,
 )
 
 data class SkillResponse(
 	val id: String,
 	val title: String,
-	val audioUrl: String,
-	val illustrationUrl: String,
+	val requiredSuccesses: Int,
+	val minAccuracyPercent: Int,
+	val requiredLessonCount: Int,
 	val createdAt: String,
 	val updatedAt: String,
 )
@@ -56,13 +58,14 @@ class SkillController(
 	fun delete(@PathVariable id: String) = skillService.delete(id)
 }
 
-private fun SkillWriteRequest.toInput() = SkillWriteInput(title, audioUrl, illustrationUrl)
+private fun SkillWriteRequest.toInput() = SkillWriteInput(title, requiredSuccesses, minAccuracyPercent, requiredLessonCount)
 
 private fun Skill.toResponse() = SkillResponse(
 	id = id,
 	title = title,
-	audioUrl = audioUrl,
-	illustrationUrl = illustrationUrl,
+	requiredSuccesses = requiredSuccesses,
+	minAccuracyPercent = minAccuracyPercent,
+	requiredLessonCount = requiredLessonCount,
 	createdAt = createdAt.toString(),
 	updatedAt = updatedAt.toString(),
 )

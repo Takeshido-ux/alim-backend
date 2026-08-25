@@ -306,10 +306,17 @@ class ProgressService(
 			val total = (existing?.totalAttempts ?: 0) + result.attempts.coerceAtLeast(1)
 			val successful = (existing?.successfulAttempts ?: 0) + if (result.correct) 1 else 0
 			val accuracy = successful.toFloat() / total.coerceAtLeast(1)
+			val practicedLessonIds = if (result.sourceLessonId.isBlank()) {
+				existing?.practicedLessonIds.orEmpty()
+			} else {
+				existing?.practicedLessonIds.orEmpty() + result.sourceLessonId
+			}
 			val state = when {
 				existing?.state == SkillMasteryState.mastered && (!result.correct || result.attempts > 1) ->
 					SkillMasteryState.review_due
-				successful >= 2 && accuracy >= MASTERY_ACCURACY -> SkillMasteryState.mastered
+				successful >= skill.requiredSuccesses &&
+					accuracy >= skill.minAccuracyPercent / 100f &&
+					practicedLessonIds.size >= skill.requiredLessonCount -> SkillMasteryState.mastered
 				total == 1 && !result.correct -> SkillMasteryState.introduced
 				else -> SkillMasteryState.practicing
 			}
@@ -321,6 +328,7 @@ class ProgressService(
 					state = state,
 					successfulAttempts = successful,
 					totalAttempts = total,
+					practicedLessonIds = practicedLessonIds,
 					lastPracticedAt = now,
 				),
 			)
@@ -489,7 +497,6 @@ class ProgressService(
 	private companion object {
 		const val STRUGGLE_ATTEMPT_THRESHOLD = 3
 		const val STRUGGLE_RETRY_THRESHOLD = 3
-		const val MASTERY_ACCURACY = 0.67f
 	}
 }
 
@@ -524,6 +531,7 @@ data class CompleteLessonInput(
 data class StepResult(
 	val stepId: String,
 	val skillId: String,
+	val sourceLessonId: String,
 	val correct: Boolean,
 	val attempts: Int,
 )

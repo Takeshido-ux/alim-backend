@@ -22,8 +22,9 @@ class SkillService(
 			Skill(
 				id = UUID.randomUUID().toString(),
 				title = normalized.title,
-				audioUrl = normalized.audioUrl,
-				illustrationUrl = normalized.illustrationUrl,
+				requiredSuccesses = normalized.requiredSuccesses,
+				minAccuracyPercent = normalized.minAccuracyPercent,
+				requiredLessonCount = normalized.requiredLessonCount,
 				createdAt = now,
 				updatedAt = now,
 			),
@@ -37,8 +38,9 @@ class SkillService(
 		return skillRepository.save(
 			existing.copy(
 				title = normalized.title,
-				audioUrl = normalized.audioUrl,
-				illustrationUrl = normalized.illustrationUrl,
+				requiredSuccesses = normalized.requiredSuccesses,
+				minAccuracyPercent = normalized.minAccuracyPercent,
+				requiredLessonCount = normalized.requiredLessonCount,
 				updatedAt = Instant.now(),
 			),
 		)
@@ -57,19 +59,21 @@ class SkillService(
 
 	private fun validate(input: SkillWriteInput) {
 		if (input.title.isBlank()) throw InvalidSkillDataException("title is required")
+		if (input.requiredSuccesses !in 1..20) throw InvalidSkillDataException("requiredSuccesses must be between 1 and 20")
+		if (input.minAccuracyPercent !in 1..100) throw InvalidSkillDataException("minAccuracyPercent must be between 1 and 100")
+		if (input.requiredLessonCount !in 1..20) throw InvalidSkillDataException("requiredLessonCount must be between 1 and 20")
 	}
 }
 
 data class SkillWriteInput(
 	val title: String,
-	val audioUrl: String = "",
-	val illustrationUrl: String = "",
+	val requiredSuccesses: Int = 2,
+	val minAccuracyPercent: Int = 67,
+	val requiredLessonCount: Int = 1,
 )
 
 private fun SkillWriteInput.normalized() = copy(
 	title = title.trim(),
-	audioUrl = audioUrl.trim(),
-	illustrationUrl = illustrationUrl.trim(),
 )
 
 class SkillNotFoundException : RuntimeException()

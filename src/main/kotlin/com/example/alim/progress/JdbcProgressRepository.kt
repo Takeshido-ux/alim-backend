@@ -40,6 +40,7 @@ class JdbcProgressRepository(
 			state = SkillMasteryState.valueOf(rs.getString("state")),
 			successfulAttempts = rs.getInt("successful_attempts"),
 			totalAttempts = rs.getInt("total_attempts"),
+			practicedLessonIds = json.stringList(rs.getString("practiced_lesson_ids")).toSet(),
 			lastPracticedAt = rs.getTimestamp("last_practiced_at").toInstant(),
 		)
 	}
@@ -179,7 +180,7 @@ class JdbcProgressRepository(
 		jdbc.query(
 			"""
 			SELECT child_id, skill_id, skill_title, state, successful_attempts,
-			       total_attempts, last_practiced_at
+			       total_attempts, practiced_lesson_ids::text, last_practiced_at
 			FROM skill_progress
 			WHERE child_id = ?
 			ORDER BY last_practiced_at DESC, skill_title
@@ -192,7 +193,7 @@ class JdbcProgressRepository(
 		jdbc.query(
 			"""
 			SELECT child_id, skill_id, skill_title, state, successful_attempts,
-			       total_attempts, last_practiced_at
+			       total_attempts, practiced_lesson_ids::text, last_practiced_at
 			FROM skill_progress
 			WHERE child_id = ? AND skill_id = ?
 			""".trimIndent(),
@@ -206,13 +207,14 @@ class JdbcProgressRepository(
 			"""
 			INSERT INTO skill_progress (
 				child_id, skill_id, skill_title, state, successful_attempts,
-				total_attempts, last_practiced_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?)
+				total_attempts, practiced_lesson_ids, last_practiced_at
+			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (child_id, skill_id) DO UPDATE SET
 				skill_title = EXCLUDED.skill_title,
 				state = EXCLUDED.state,
 				successful_attempts = EXCLUDED.successful_attempts,
 				total_attempts = EXCLUDED.total_attempts,
+				practiced_lesson_ids = EXCLUDED.practiced_lesson_ids,
 				last_practiced_at = EXCLUDED.last_practiced_at
 			""".trimIndent(),
 			progress.childId,
@@ -221,6 +223,7 @@ class JdbcProgressRepository(
 			progress.state.name,
 			progress.successfulAttempts,
 			progress.totalAttempts,
+			json.toJsonb(progress.practicedLessonIds.toList()),
 			progress.lastPracticedAt.toTimestamp(),
 		)
 		return progress

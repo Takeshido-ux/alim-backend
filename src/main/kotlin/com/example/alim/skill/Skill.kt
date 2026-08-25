@@ -5,8 +5,9 @@ import java.time.Instant
 data class Skill(
 	val id: String,
 	val title: String,
-	val audioUrl: String = "",
-	val illustrationUrl: String = "",
+	val requiredSuccesses: Int = 2,
+	val minAccuracyPercent: Int = 67,
+	val requiredLessonCount: Int = 1,
 	val createdAt: Instant,
 	val updatedAt: Instant,
 )
@@ -20,9 +21,5 @@ internal fun Map<String, Any?>.withoutLegacySkillFields(): Map<String, Any?> =
 internal fun Map<String, Any?>.withResolvedSkill(skill: Skill?): Map<String, Any?> {
 	val clean = withoutLegacySkillFields()
 	if (skill == null) return clean
-	return clean + mapOf(
-		"skillId" to skill.id,
-		"audioUrl" to skill.audioUrl,
-		"illustrationUrl" to skill.illustrationUrl,
-	)
+	return clean + ("skillId" to skill.id)
 }

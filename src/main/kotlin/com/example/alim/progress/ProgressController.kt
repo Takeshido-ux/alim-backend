@@ -26,6 +26,7 @@ data class ProgressUpsertRequest(
 data class StepResultRequest(
 	val stepId: String,
 	val skillId: String,
+	val sourceLessonId: String,
 	val correct: Boolean,
 	@field:Min(value = 1, message = "attempts must be >= 1")
 	val attempts: Int = 1,
@@ -119,7 +120,7 @@ class ProgressController(
 				firstTryPracticeCorrect = body.firstTryPracticeCorrect,
 				incorrectPracticeRetries = body.incorrectPracticeRetries,
 				stepResults = body.stepResults.map {
-					StepResult(it.stepId, it.skillId, it.correct, it.attempts)
+					StepResult(it.stepId, it.skillId, it.sourceLessonId, it.correct, it.attempts)
 				},
 			),
 		)
@@ -147,7 +148,7 @@ class ProgressController(
 	) {
 		progressService.completeReview(
 			childId,
-			results.map { StepResult(it.stepId, it.skillId, it.correct, it.attempts) },
+			results.map { StepResult(it.stepId, it.skillId, it.sourceLessonId, it.correct, it.attempts) },
 		)
 	}
 

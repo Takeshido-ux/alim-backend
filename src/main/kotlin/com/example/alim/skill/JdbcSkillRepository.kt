@@ -15,20 +15,21 @@ class JdbcSkillRepository(
 		Skill(
 			id = rs.getString("id"),
 			title = rs.getString("title"),
-			audioUrl = rs.getString("audio_url"),
-			illustrationUrl = rs.getString("illustration_url"),
+			requiredSuccesses = rs.getInt("required_successes"),
+			minAccuracyPercent = rs.getInt("min_accuracy_percent"),
+			requiredLessonCount = rs.getInt("required_lesson_count"),
 			createdAt = rs.getTimestamp("created_at").toInstant(),
 			updatedAt = rs.getTimestamp("updated_at").toInstant(),
 		)
 	}
 
 	override fun findAll(): List<Skill> = jdbc.query(
-		"SELECT id, title, audio_url, illustration_url, created_at, updated_at FROM skills ORDER BY title",
+		"SELECT id, title, required_successes, min_accuracy_percent, required_lesson_count, created_at, updated_at FROM skills ORDER BY title",
 		mapper,
 	)
 
 	override fun findById(id: String): Skill? = jdbc.query(
-		"SELECT id, title, audio_url, illustration_url, created_at, updated_at FROM skills WHERE id = ?",
+		"SELECT id, title, required_successes, min_accuracy_percent, required_lesson_count, created_at, updated_at FROM skills WHERE id = ?",
 		mapper,
 		id,
 	).firstOrNull()
@@ -36,18 +37,20 @@ class JdbcSkillRepository(
 	override fun save(skill: Skill): Skill {
 		jdbc.update(
 			"""
-			INSERT INTO skills (id, title, audio_url, illustration_url, created_at, updated_at)
-			VALUES (?, ?, ?, ?, ?, ?)
+			INSERT INTO skills (id, title, required_successes, min_accuracy_percent, required_lesson_count, created_at, updated_at)
+			VALUES (?, ?, ?, ?, ?, ?, ?)
 			ON CONFLICT (id) DO UPDATE SET
 				title = EXCLUDED.title,
-				audio_url = EXCLUDED.audio_url,
-				illustration_url = EXCLUDED.illustration_url,
+				required_successes = EXCLUDED.required_successes,
+				min_accuracy_percent = EXCLUDED.min_accuracy_percent,
+				required_lesson_count = EXCLUDED.required_lesson_count,
 				updated_at = EXCLUDED.updated_at
 			""".trimIndent(),
 			skill.id,
 			skill.title,
-			skill.audioUrl,
-			skill.illustrationUrl,
+			skill.requiredSuccesses,
+			skill.minAccuracyPercent,
+			skill.requiredLessonCount,
 			skill.createdAt.toTimestamp(),
 			skill.updatedAt.toTimestamp(),
 		)

@@ -46,5 +46,6 @@ data class SkillProgress(
 	val state: SkillMasteryState,
 	val successfulAttempts: Int,
 	val totalAttempts: Int,
+	val practicedLessonIds: Set<String> = emptySet(),
 	val lastPracticedAt: Instant,
 )
