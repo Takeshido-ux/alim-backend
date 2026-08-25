@@ -185,7 +185,11 @@ private fun LessonWriteInput.normalized(): LessonWriteInput {
 				stepId = stepId,
 				type = type,
 				payload = step.payload.withoutLegacySkillFields(),
-				assets = if (type == "video") step.assets.map(String::trim).filter(String::isNotEmpty) else emptyList(),
+				assets = if (type in setOf("listen", "repeat", "video")) {
+					step.assets.map(String::trim).filter(String::isNotEmpty)
+				} else {
+					emptyList()
+				},
 			)
 		},
 	)
