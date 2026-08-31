@@ -73,6 +73,17 @@ class ProgressService(
 	fun upsertProgress(childId: String, lessonId: String, input: ProgressUpsertInput): LessonProgress {
 		childService.requireOwnedChildForCurrentParent(childId)
 		val lesson = lessonService.getById(lessonId)
+		return progressRepository.withChildLock(childId) {
+			upsertProgressLocked(childId, lesson, input)
+		}
+	}
+
+	private fun upsertProgressLocked(
+		childId: String,
+		lesson: Lesson,
+		input: ProgressUpsertInput,
+	): LessonProgress {
+		val lessonId = lesson.id
 		ensureLessonUnlocked(childId, lesson)
 
 		val existing = progressRepository.find(childId, lessonId)
@@ -120,6 +131,17 @@ class ProgressService(
 	fun completeLesson(childId: String, lessonId: String, input: CompleteLessonInput): CompleteLessonResult {
 		childService.requireOwnedChildForCurrentParent(childId)
 		val lesson = lessonService.getById(lessonId)
+		return progressRepository.withChildLock(childId) {
+			completeLessonLocked(childId, lesson, input)
+		}
+	}
+
+	private fun completeLessonLocked(
+		childId: String,
+		lesson: Lesson,
+		input: CompleteLessonInput,
+	): CompleteLessonResult {
+		val lessonId = lesson.id
 		ensureLessonUnlocked(childId, lesson)
 
 		val existing = progressRepository.find(childId, lessonId)

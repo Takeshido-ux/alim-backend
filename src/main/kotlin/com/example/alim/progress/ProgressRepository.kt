@@ -5,6 +5,8 @@ import org.springframework.stereotype.Repository
 import java.util.concurrent.ConcurrentHashMap
 
 interface ProgressRepository {
+	fun <T> withChildLock(childId: String, action: () -> T): T
+
 	fun findByChildId(childId: String): List<LessonProgress>
 
 	fun find(childId: String, lessonId: String): LessonProgress?
@@ -30,8 +32,14 @@ class InMemoryProgressRepository : ProgressRepository {
 	private val progress = ConcurrentHashMap<String, LessonProgress>()
 	private val wallets = ConcurrentHashMap<String, RewardWallet>()
 	private val skills = ConcurrentHashMap<String, SkillProgress>()
+	private val childLocks = ConcurrentHashMap<String, Any>()
 
 	private fun key(childId: String, lessonId: String) = "$childId::$lessonId"
+
+	override fun <T> withChildLock(childId: String, action: () -> T): T =
+		synchronized(childLocks.computeIfAbsent(childId) { Any() }) {
+			action()
+		}
 
 	override fun findByChildId(childId: String): List<LessonProgress> =
 		progress.values.filter { it.childId == childId }
@@ -66,5 +74,6 @@ class InMemoryProgressRepository : ProgressRepository {
 		progress.entries.removeIf { (_, item) -> item.childId == childId }
 		wallets.remove(childId)
 		skills.entries.removeIf { (_, item) -> item.childId == childId }
+		childLocks.remove(childId)
 	}
 }

@@ -45,6 +45,16 @@ class JdbcProgressRepository(
 		)
 	}
 
+	@Transactional
+	override fun <T> withChildLock(childId: String, action: () -> T): T {
+		jdbc.queryForObject(
+			"SELECT id FROM children WHERE id = ? FOR UPDATE",
+			String::class.java,
+			childId,
+		)
+		return action()
+	}
+
 	override fun findByChildId(childId: String): List<LessonProgress> =
 		jdbc.query(
 			"""
